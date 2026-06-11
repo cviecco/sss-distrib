@@ -1,4 +1,12 @@
 
+Its 2026 and Johnny cannot encrypt file long term. 
+GPG works, but is combersome to use. However has lots of tooling around to make it work
+AGE nice cyptography, trusting the filesystem by default is not workable for long term secrets.
+
+
+ 
+
+
 ##
 Goal:
 
