@@ -1,8 +1,12 @@
 package sssdoc
 
 import (
-	"crypto/rand"
+	"bytes"
+	"crypto/sha512"
 	"fmt"
+	"io"
+
+	"filippo.io/age"
 )
 
 const (
@@ -13,7 +17,7 @@ const (
 type EncrypedShare struct {
 	Identifier           string
 	PlaintextFingerPrint []byte
-	EncrypedBlob         []byte
+	EncryptedBlob        []byte
 	KeyType              int
 	PublicKey            []byte
 }
@@ -44,18 +48,49 @@ func NewSSDocFromShareDocJSON([]byte) (*SssDoc, error) {
 
 const randomStringEntropyBytes = 32
 
+/*
 func genRandomString() ([]byte, error) {
-	size := randomStringEntropyBytes
-	rb := make([]byte, size)
-	_, err := rand.Read(rb)
+}
+*/
+
+func newFromAgeKeysInternal(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
+
+	//1 Generate secret and shares
+	//2. Create a new encryptedShare with each share
+	//3. Combine to make a new doc
+
+	plaintextShares, err := generateAndSplitSecret(requiredShares, len(recipients))
 	if err != nil {
 		return nil, err
 	}
-	return rb, nil
+	var outDoc ShareDoc
+	for i, recipient := range recipients {
+		identityBuffer := bytes.NewBuffer(recipient)
+		parsedRecipient, err := age.ParseRecipients(identityBuffer)
+		if err != nil {
+			return nil, err
+		}
+		plaintextData := plaintextShares[i]
+		plaintextFP := sha512.Sum512(plaintextShares[i])
+		ptReader := bytes.NewReader(plaintextData)
+		//var encBuffer bytes.Buffer
+		encReader, err := age.EncryptReader(ptReader, parsedRecipient[0])
+		if err != nil {
+			return nil, fmt.Errorf("Unable to encrypt reader %w", err)
+		}
+		encData, err := io.ReadAll(encReader)
 
-	//return base64.RawURLEncoding.EncodeToString(rb), nil
-}
+		docShare := EncrypedShare{
+			Identifier:           identifiers[i],
+			EncryptedBlob:        encData,
+			PlaintextFingerPrint: plaintextFP[:],
+			KeyType:              KeyTypeAge,
+			// PublicKey
+		}
+		outDoc.Shares = append(outDoc.Shares, docShare)
 
-func newFromAgeKeysInternal(publicKeys []byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
-	return nil, fmt.Errorf("not implemented")
+	}
+	return &outDoc, nil
+
+	//return nil, fmt.Errorf("not implemented")
 }
