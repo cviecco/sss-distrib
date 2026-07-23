@@ -33,10 +33,10 @@ func generateAndSplitSecret(threshold int, numshares int) ([][]byte, error) {
 		return nil, err
 	}
 
-	return withSecretGenerateAndSplitSecret(secret, threshold, numshares)
+	return withSecretGenerateSecretShares(secret, threshold, numshares)
 }
 
-func withSecretGenerateAndSplitSecret(secret []byte, threshold int, numshares int) ([][]byte, error) {
+func withSecretGenerateSecretShares(secret []byte, threshold int, numshares int) ([][]byte, error) {
 	return shamir.GenerateShares(secret, numshares, threshold)
 }
 

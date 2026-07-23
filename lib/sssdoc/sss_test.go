@@ -15,7 +15,7 @@ func TestBaseSSS(t *testing.T) {
 		//threshold := 2
 		for numshares := threshold + 1; numshares < threshold+4; numshares++ {
 			//numshares := 4
-			shares, err := withSecretGenerateAndSplitSecret(secret, threshold, numshares)
+			shares, err := withSecretGenerateSecretShares(secret, threshold, numshares)
 			require.NoError(t, err)
 			// TODO: make a loop ensuring it actually is able to combine
 			sharesToCombine := shares[1:]
