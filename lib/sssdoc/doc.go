@@ -31,7 +31,7 @@ type ShareDoc struct {
 type SssDoc struct {
 	sharedSecret   []byte
 	processedShare map[string][]byte
-	Doc            ShareDoc
+	Doc            *ShareDoc
 }
 
 func NewSSSDoc() (*SssDoc, error) {
@@ -45,6 +45,14 @@ func GenerateNewDocFromAgeKeys(publicKeys []byte, identifiers []string, required
 
 func NewSSDocFromShareDocJSON([]byte) (*SssDoc, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func NewSSSDocFromShareDoc(sd *ShareDoc) *SssDoc {
+	rvalue := SssDoc{
+		Doc:            sd,
+		processedShare: make(map[string][]byte),
+	}
+	return &rvalue
 }
 
 const randomStringEntropyBytes = 32
