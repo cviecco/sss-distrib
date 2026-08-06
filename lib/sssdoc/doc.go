@@ -166,6 +166,31 @@ func ageDecryptSingleShare(share EncrypedShare, identities []age.Identity) ([]by
 	return io.ReadAll(plaintextReader)
 }
 
+// gpgDecryptSingleShare decrypts share.EncryptedBlob using identity, an
+// armored GPG/PGP private key (unlocked, i.e. no passphrase). It follows the
+// "Encrypt / Decrypt with PGP keys" recipe from the gopenpgp README: the
+// armored private key is loaded with crypto.NewPrivateKeyFromArmored, a
+// decryption handle is built via pgp.Decryption().DecryptionKey(...).New(),
+// and the blob is decrypted with that handle's Decrypt method.
+func gpgDecryptSingleShare(share EncrypedShare, identity []byte) ([]byte, error) {
+	privateKey, err := crypto.NewPrivateKeyFromArmored(string(identity), nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse armored gpg private key: %w", err)
+	}
+	pgp := crypto.PGP()
+	decHandle, err := pgp.Decryption().DecryptionKey(privateKey).New()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create gpg decryption handle: %w", err)
+	}
+	defer decHandle.ClearPrivateParams()
+	decrypted, err := decHandle.Decrypt(share.EncryptedBlob, crypto.Bytes)
+	if err != nil {
+		// TODO, dont do the +%v
+		return nil, fmt.Errorf("unable to decrypt %+v %w", share, err)
+	}
+	return decrypted.Bytes(), nil
+}
+
 func (sd *SssDoc) ProcessShare(plaintextShare []byte) ([]byte, error) {
 	shareFP := sha512.Sum512(plaintextShare)
 	b64ShareFP := base64.StdEncoding.EncodeToString(shareFP[:])

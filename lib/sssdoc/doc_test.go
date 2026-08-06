@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"filippo.io/age"
+	"github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/stretchr/testify/require"
 )
 
@@ -146,6 +147,61 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 	plaintextSecrets := [][]byte{}
 	for i, identity := range identities {
 		ptShare, err := ageDecryptSingleShare(shareDoc.Shares[i], identity)
+		require.NoError(t, err)
+		plaintextSecrets = append(plaintextSecrets, ptShare)
+	}
+
+	sssDoc := NewSSSDocFromShareDoc(shareDoc)
+	require.NotNil(t, sssDoc)
+
+	found := false
+	for _, ptShare := range plaintextSecrets {
+		rebuiltSecret, err := sssDoc.ProcessShare(ptShare)
+		require.NoError(t, err)
+		if rebuiltSecret != nil {
+			found = true
+			require.Equal(t, rebuiltSecret, secret)
+		}
+	}
+	require.True(t, found)
+}
+
+func TestGpgCreateDecodeRoundTrip(t *testing.T) {
+	secret, err := generateSecret()
+	require.NoError(t, err)
+
+	// NOTE: the pgp_sss_test_1/2/3 fixtures above each bundle two concatenated
+	// key entities (verified via openpgp/packet.Reader), which gopenpgp
+	// rejects with "the key contains too many entities". Until those
+	// fixtures are regenerated as single-entity keys, this test generates
+	// its own throwaway keypairs instead.
+	pgp := crypto.PGP()
+	identifiers := []string{"1", "2", "3"}
+	var recipients [][]byte
+	var privateKeys []*crypto.Key
+	for i := range identifiers {
+		privateKey, err := pgp.KeyGeneration().
+			AddUserId(fmt.Sprintf("gpg_sss_test_%d", i), fmt.Sprintf("gpg_sss_test_%d@example.com", i)).
+			New().
+			GenerateKey()
+		require.NoError(t, err)
+		privateKeys = append(privateKeys, privateKey)
+
+		publicKey, err := privateKey.ToPublic()
+		require.NoError(t, err)
+		armoredPub, err := publicKey.GetArmoredPublicKey()
+		require.NoError(t, err)
+		recipients = append(recipients, []byte(armoredPub))
+	}
+
+	shareDoc, err := gpgGenerateDocWithSecret(secret, recipients, identifiers, 2)
+	require.NoError(t, err)
+
+	plaintextSecrets := [][]byte{}
+	for i, privateKey := range privateKeys {
+		armoredPriv, err := privateKey.Armor()
+		require.NoError(t, err)
+		ptShare, err := gpgDecryptSingleShare(shareDoc.Shares[i], []byte(armoredPriv))
 		require.NoError(t, err)
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
