@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"filippo.io/age"
+	"github.com/ProtonMail/gopenpgp/v3/crypto"
 )
 
 const (
@@ -106,6 +107,50 @@ func ageGenerateDocWithSecret(secret []byte, recipients [][]byte, identifiers []
 		}
 		outDoc.Shares = append(outDoc.Shares, docShare)
 
+	}
+	outDoc.RequiredShares = requiredShares
+	return &outDoc, nil
+}
+
+// gpgGenerateDocWithSecret splits secret into shares and encrypts each share
+// to the corresponding recipient in recipients, where each entry is an
+// armored GPG/PGP public key. Encryption follows the "Encrypt / Decrypt with
+// PGP keys" recipe from the gopenpgp README: an armored public key is loaded
+// with crypto.NewKeyFromArmored, an encryption handle is built for that
+// recipient via pgp.Encryption().Recipient(...).New(), and the share is
+// encrypted with that handle's Encrypt method.
+func gpgGenerateDocWithSecret(secret []byte, recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
+	plaintextShares, err := withSecretGenerateSecretShares(secret, requiredShares, len(recipients))
+	if err != nil {
+		return nil, err
+	}
+	pgp := crypto.PGP()
+	var outDoc ShareDoc
+	for i, recipient := range recipients {
+		publicKey, err := crypto.NewKeyFromArmored(string(recipient))
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse armored gpg public key: %w", err)
+		}
+		encHandle, err := pgp.Encryption().Recipient(publicKey).New()
+		if err != nil {
+			return nil, fmt.Errorf("unable to create gpg encryption handle: %w", err)
+		}
+		plaintextData := plaintextShares[i]
+		plaintextFP := sha512.Sum512(plaintextData)
+		pgpMessage, err := encHandle.Encrypt(plaintextData)
+		if err != nil {
+			return nil, fmt.Errorf("unable to encrypt share: %w", err)
+		}
+		encData := pgpMessage.Bytes()
+
+		docShare := EncrypedShare{
+			Identifier:           identifiers[i],
+			EncryptedBlob:        encData,
+			PlaintextFingerPrint: plaintextFP[:],
+			KeyType:              KeyTypePGP,
+			PublicKey:            recipient,
+		}
+		outDoc.Shares = append(outDoc.Shares, docShare)
 	}
 	outDoc.RequiredShares = requiredShares
 	return &outDoc, nil
