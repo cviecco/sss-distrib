@@ -22,37 +22,29 @@ const age_test_key_3 = `# created: 2026-07-16T12:42:00-07:00
 # public key: age1j3nhn07hllphue7d8n675csazfku8969c8j82g7kkfs0cepcpqfs9qykdz
 AGE-SECRET-KEY-1PCL52PZJFSGXHJHTERLS6D08V7DSL58VX5EJYWV0E7GN7CWXYUQQDW9MCW`
 
+// same as the luggage combination
+const testPassphrase = `12345`
+
+// gpg --default-new-key-algo rsa4096 --gen-key
+//  gpg  --gen-key
+
 const pgp_sss_test_1 = `-----BEGIN PGP PRIVATE KEY BLOCK-----
 
-lIYEamfTeRYJKwYBBAHaRw8BAQdA1vkip7eHZLcl/5pnwJSm8tA21TL3gW9HxJfV
-wpEFEhT+BwMC3EIGkQLycXL/P6Ko7qm24E0lTGhVycyfJekRpF5GyJFdEeBwipQl
-q5U+vnXwXXszI7foLQl7O2EGbJawq3ilmNpChAlXBUvwm8wvX/YA8rQic3NzX3Rl
-c3RfMSA8c3NzX3Rlc3QxQGV4YW1wbGUuY29tPoi0BBMWCgBdFiEEoygrVIWceBq+
-sOHOlvdt8JZH2IQFAmpn03kbFIAAAAAABAAObWFudTIsMi41KzEuMTIsMCwzAhsD
-BQkFo5qABQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJEJb3bfCWR9iE5KMB
-AMO22gGBZioen+1+6ERQkoAPs2mcsq4oIXfFHAkDI+M2APYs/cSAgIGUjrJHyRcp
-2K6YDBzrDDHG5YxNgCou/xsDnIsEamfTeRIKKwYBBAGXVQEFAQEHQAwEhw81UpQC
-6XPnTmjpOcF6A2sZPxazppAdt03BwTBLAwEIB/4HAwIc6GInviRaHP+23oEfMaoV
-doIQYUfX3lNEZAY6onNtXuFLrCKVce41Aa+ZQiqncYn1IKDFK0EV3hyK1FOcQWPc
-WrYMuv3IpAK95yNcRmu6iJoEGBYKAEIWIQSjKCtUhZx4Gr6w4c6W923wlkfYhAUC
-amfTeRsUgAAAAAAEAA5tYW51MiwyLjUrMS4xMiwwLDMCGwwFCQWjmoAACgkQlvdt
-8JZH2IQf6QEA4APsFM8qEZ1zklHmkOUNdJXh1f3wPG7UmD33hktjClwA/RkI3YVX
-ClZx/25Bkyy4B7CRJYhus0a4C5XEjZ7U3KMJlIYEamfT4RYJKwYBBAHaRw8BAQdA
-j+jNv+w5J6OM8i2M2JZHh787jMil7OfeCq1jyobr+OH+BwMCIzh5yBH8smP/fBtD
-IcHWn/DfSmnOkNlFHo/UJh7+mspAAzFD3jD//o5MMuxsRv6Kue4td97ZczUQqh2/
-u+oFAUzweK/AN0B9iQUW3ba2WbQjc3NzX3Rlc3RfMiA8c3NzX3Rlc3RfMUBleGFt
-cGxlLmNvbT6ItQQTFgoAXRYhBLUf2KrSUb+OF25la9vnt+fXMdgxBQJqZ9PhGxSA
-AAAAAAQADm1hbnUyLDIuNSsxLjEyLDAsMwIbAwUJBaOagAULCQgHAgIiAgYVCgkI
-CwIEFgIDAQIeBwIXgAAKCRDb57fn1zHYMd/MAQDfTLb700FCGPNO7n60cLwXWcE+
-4XABMz4QLEPmJHEDRQEAhS36r70Ow0PMqVj5P5PMO5RTLWhKHkSFmWrPj1lyZgmc
-iwRqZ9PhEgorBgEEAZdVAQUBAQdAgfE0QFrKyse46ntFzqTQdmDqFMFDarA0Ykfq
-oYpuPS0DAQgH/gcDAo4TjqEieGfF/8qtqDFRjNV2JQwiQJ0kPxEiIi66GkF8jBIs
-iZ7idxm+c3iOsP8h5QNBALFd17xJJqlYMhzs4xiZ5gconTzQrn5BrBe3/kqImgQY
-FgoAQhYhBLUf2KrSUb+OF25la9vnt+fXMdgxBQJqZ9PhGxSAAAAAAAQADm1hbnUy
-LDIuNSsxLjEyLDAsMwIbDAUJBaOagAAKCRDb57fn1zHYMUKDAQCmjHVc4d5XCzKe
-cMKi8mTIFuq0BScRAEztRfWsr/HizwD/fAFsvaLzRF3hVUCOHOhpFt3+f4M5YKwz
-fUoONqKCvQE=
-=wC4L
+lIYEanuV0RYJKwYBBAHaRw8BAQdAreB93UG39zZbszjm4qZAPkLIsTZzFiJ0EkZm
+4D3h9IX+BwMCTFbqe4/9FiL/SYTNV1eQnYN5VZOIwN3sEPL/fPkTB/pf0nm07Pol
+SLo4VPYiLXIcR4dt1KSmx/tHEgM4aQVrbTWsSV8fvlZFFEM/MGC5KrQrc3NzX3Rl
+c3Rfa2V5XzEgPHNzc190ZXN0X2tleV8xQGV4YW1wbGUuY29tPoi1BBMWCgBdFiEE
+75wm5LSQ1mcsE+kP6BosHkovdwEFAmp7ldEbFIAAAAAABAAObWFudTIsMi41KzEu
+MTIsMCwzAhsDBQkFo5qABQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJEOga
+LB5KL3cB4KIBANir8Gw1Y8E1xL2TAtIuHEatoSY2GczBa/5m/IOxHo7wAQCLgoDl
+sQvk/mK3Wzad4gbhAQboy3pqngwxvAazpDvnApyLBGp7ldESCisGAQQBl1UBBQEB
+B0BYOaOjpP3NqtQAaI9FdVvRYrR1xiZ/HmovJfibrq/8JgMBCAf+BwMCKVb6Rp6U
+/k3/w9qhxMHuD71aglHVJrryJXjnIgnbm4g+vMewjXnVkTdRpsDuTJyEx/8hUPqi
+2QtOGRK6Xib96W1T88RNxoGtbkcOeUmE7YiaBBgWCgBCFiEE75wm5LSQ1mcsE+kP
+6BosHkovdwEFAmp7ldEbFIAAAAAABAAObWFudTIsMi41KzEuMTIsMCwzAhsMBQkF
+o5qAAAoJEOgaLB5KL3cBniMBALEmun8x14Vi8wVNaxlzxXrhsqoCkvjO7xzE0fPv
+2Wd3AQDr7IcJYSptY4uDFiu7pFr2NkYpHZ6ttZ8B2XphCIGECQ==
+=2wd5
 -----END PGP PRIVATE KEY BLOCK-----`
 
 // gpg --export-secret-key -a  sss_test_2
@@ -170,28 +162,22 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 	secret, err := generateSecret()
 	require.NoError(t, err)
 
-	// NOTE: the pgp_sss_test_1/2/3 fixtures above each bundle two concatenated
-	// key entities (verified via openpgp/packet.Reader), which gopenpgp
-	// rejects with "the key contains too many entities". Until those
-	// fixtures are regenerated as single-entity keys, this test generates
-	// its own throwaway keypairs instead.
-	pgp := crypto.PGP()
 	identifiers := []string{"1", "2", "3"}
+	armoredPrivate := []string{pgp_sss_test_1,
+		pgp_sss_test_2, pgp_sss_test_3}
 	var recipients [][]byte
 	var privateKeys []*crypto.Key
-	for i := range identifiers {
-		privateKey, err := pgp.KeyGeneration().
-			AddUserId(fmt.Sprintf("gpg_sss_test_%d", i), fmt.Sprintf("gpg_sss_test_%d@example.com", i)).
-			New().
-			GenerateKey()
+
+	for _, armored := range armoredPrivate {
+		privateKey, err := crypto.NewPrivateKeyFromArmored(armored, []byte(testPassphrase))
 		require.NoError(t, err)
 		privateKeys = append(privateKeys, privateKey)
-
 		publicKey, err := privateKey.ToPublic()
 		require.NoError(t, err)
 		armoredPub, err := publicKey.GetArmoredPublicKey()
 		require.NoError(t, err)
 		recipients = append(recipients, []byte(armoredPub))
+
 	}
 
 	shareDoc, err := gpgGenerateDocWithSecret(secret, recipients, identifiers, 2)
