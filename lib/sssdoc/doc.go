@@ -166,6 +166,25 @@ func ageDecryptSingleShare(share EncrypedShare, identities []age.Identity) ([]by
 	return io.ReadAll(plaintextReader)
 }
 
+func gpgDecryptSingleShare(share EncrypedShare, armoredPrivate []byte, passphrase []byte) ([]byte, error) {
+	privateKey, err := crypto.NewPrivateKeyFromArmored(string(armoredPrivate), passphrase)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse armored gpg private key: %w", err)
+	}
+	pgp := crypto.PGP()
+	decHandle, err := pgp.Decryption().DecryptionKey(privateKey).New()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create gpg decryption handle: %w", err)
+	}
+	defer decHandle.ClearPrivateParams()
+	decrypted, err := decHandle.Decrypt(share.EncryptedBlob, crypto.Bytes)
+	if err != nil {
+		// TODO, dont do the +%v
+		return nil, fmt.Errorf("unable to decrypt %+v %w", share, err)
+	}
+	return decrypted.Bytes(), nil
+}
+
 func (sd *SssDoc) ProcessShare(plaintextShare []byte) ([]byte, error) {
 	shareFP := sha512.Sum512(plaintextShare)
 	b64ShareFP := base64.StdEncoding.EncodeToString(shareFP[:])
