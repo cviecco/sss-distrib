@@ -184,10 +184,8 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 
 	plaintextSecrets := [][]byte{}
-	for i, privateKey := range privateKeys {
-		armoredPriv, err := privateKey.Armor()
-		require.NoError(t, err)
-		ptShare, err := gpgDecryptSingleShare(shareDoc.Shares[i], []byte(armoredPriv))
+	for i, armored := range armoredPrivate {
+		ptShare, err := gpgDecryptSingleShare(shareDoc.Shares[i], []byte(armored), []byte(testPassphrase))
 		require.NoError(t, err)
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}

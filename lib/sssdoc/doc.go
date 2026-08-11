@@ -166,14 +166,8 @@ func ageDecryptSingleShare(share EncrypedShare, identities []age.Identity) ([]by
 	return io.ReadAll(plaintextReader)
 }
 
-// gpgDecryptSingleShare decrypts share.EncryptedBlob using identity, an
-// armored GPG/PGP private key (unlocked, i.e. no passphrase). It follows the
-// "Encrypt / Decrypt with PGP keys" recipe from the gopenpgp README: the
-// armored private key is loaded with crypto.NewPrivateKeyFromArmored, a
-// decryption handle is built via pgp.Decryption().DecryptionKey(...).New(),
-// and the blob is decrypted with that handle's Decrypt method.
-func gpgDecryptSingleShare(share EncrypedShare, identity []byte) ([]byte, error) {
-	privateKey, err := crypto.NewPrivateKeyFromArmored(string(identity), nil)
+func gpgDecryptSingleShare(share EncrypedShare, armoredPrivate []byte, passphrase []byte) ([]byte, error) {
+	privateKey, err := crypto.NewPrivateKeyFromArmored(string(armoredPrivate), passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse armored gpg private key: %w", err)
 	}
