@@ -120,7 +120,7 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 		recipients = append(recipients, []byte(recipient))
 		identifiers[i] = fmt.Sprintf("%d", i)
 	}
-	shareDoc, err := ageGenerateDocWithSecret(secret, recipients, identifiers, 2)
+	shareDoc, err := generateDocWithSecret(secret, recipients, identifiers, 2)
 	require.NoError(t, err)
 
 	identitiesStrings := []string{
@@ -180,7 +180,7 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 
 	}
 
-	shareDoc, err := gpgGenerateDocWithSecret(secret, recipients, identifiers, 2)
+	shareDoc, err := generateDocWithSecret(secret, recipients, identifiers, 2)
 	require.NoError(t, err)
 
 	plaintextSecrets := [][]byte{}
