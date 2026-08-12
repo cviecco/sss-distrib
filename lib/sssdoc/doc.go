@@ -64,7 +64,7 @@ func newFromAgeKeysInternal(recipients [][]byte, identifiers []string, requiredS
 	if err != nil {
 		return nil, err
 	}
-	return ageGenerateDocWithSecret(secret, recipients, identifiers, requiredShares)
+	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
 func encryptDataWithPublic(plaintextData []byte, recipientPublic []byte) ([]byte, int, error) {
