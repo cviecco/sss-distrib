@@ -59,10 +59,6 @@ func NewSSSDocFromShareDoc(sd *ShareDoc) *SssDoc {
 
 const randomStringEntropyBytes = 32
 
-/*
-func genRandomString() ([]byte, error) {
-}
-*/
 func newFromAgeKeysInternal(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
 	secret, err := generateSecret()
 	if err != nil {
@@ -109,54 +105,11 @@ func encryptDataWithPublic(plaintextData []byte, recipientPublic []byte) ([]byte
 
 }
 
-func ageGenerateDocWithSecret(secret []byte, recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
-	//func newFromAgeKeysInternal(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
-
-	//1 Generate secret and shares
-	//2. Create a new encryptedShare with each share
-	//3. Combine to make a new doc
-
-	plaintextShares, err := withSecretGenerateSecretShares(secret, requiredShares, len(recipients))
-	if err != nil {
-		return nil, err
-	}
-	var outDoc ShareDoc
-	for i, recipient := range recipients {
-		identityBuffer := bytes.NewBuffer(recipient)
-		parsedRecipient, err := age.ParseRecipients(identityBuffer)
-		if err != nil {
-			return nil, err
-		}
-		plaintextData := plaintextShares[i]
-		plaintextFP := sha512.Sum512(plaintextShares[i])
-		ptReader := bytes.NewReader(plaintextData)
-		//var encBuffer bytes.Buffer
-		encReader, err := age.EncryptReader(ptReader, parsedRecipient[0])
-		if err != nil {
-			return nil, fmt.Errorf("Unable to encrypt reader %w", err)
-		}
-		encData, err := io.ReadAll(encReader)
-
-		docShare := EncrypedShare{
-			Identifier:           identifiers[i],
-			EncryptedBlob:        encData,
-			PlaintextFingerPrint: plaintextFP[:],
-			KeyType:              KeyTypeAge,
-			// PublicKey
-		}
-		outDoc.Shares = append(outDoc.Shares, docShare)
-
-	}
-	outDoc.RequiredShares = requiredShares
-	return &outDoc, nil
-}
-
 func generateDocWithSecret(secret []byte, recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
 	plaintextShares, err := withSecretGenerateSecretShares(secret, requiredShares, len(recipients))
 	if err != nil {
 		return nil, err
 	}
-	//pgp := crypto.PGP()
 	var outDoc ShareDoc
 	for i, recipient := range recipients {
 		plaintextData := plaintextShares[i]
