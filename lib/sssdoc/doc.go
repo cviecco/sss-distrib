@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	KeyTypeAge = iota
+	KeyTypeUnknown = iota
+	KeyTypeAge
 	KeyTypePGP
 )
 
@@ -70,6 +71,44 @@ func newFromAgeKeysInternal(recipients [][]byte, identifiers []string, requiredS
 	return ageGenerateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
+func encryptDataWithPublic(plaintextData []byte, recipientPublic []byte) ([]byte, int, error) {
+	publicForBuffer := bytes.Clone(recipientPublic)
+	identityBuffer := bytes.NewBuffer(publicForBuffer)
+
+	parsedRecipient, ageParseErr := age.ParseRecipients(identityBuffer)
+	if ageParseErr == nil {
+		// This is an age key
+		ptReader := bytes.NewReader(plaintextData)
+		encReader, err := age.EncryptReader(ptReader, parsedRecipient[0])
+		if err != nil {
+			return nil, KeyTypeAge, err
+		}
+		encData, err := io.ReadAll(encReader)
+		if err != nil {
+			return nil, KeyTypeAge, err
+		}
+		return encData, KeyTypeAge, nil
+
+	}
+	// try now with gpg
+	publicKey, err := crypto.NewKeyFromArmored(string(recipientPublic))
+	if err == nil {
+		pgp := crypto.PGP()
+		encHandle, err := pgp.Encryption().Recipient(publicKey).New()
+		if err != nil {
+			return nil, KeyTypePGP, err
+		}
+		pgpMessage, err := encHandle.Encrypt(plaintextData)
+		if err != nil {
+			return nil, KeyTypePGP, err
+		}
+		return pgpMessage.Bytes(), KeyTypePGP, nil
+
+	}
+	return nil, KeyTypeUnknown, fmt.Errorf("Unable to parse public key as age or gpg public armored %w", ageParseErr)
+
+}
+
 func ageGenerateDocWithSecret(secret []byte, recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
 	//func newFromAgeKeysInternal(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
 
@@ -112,42 +151,26 @@ func ageGenerateDocWithSecret(secret []byte, recipients [][]byte, identifiers []
 	return &outDoc, nil
 }
 
-// gpgGenerateDocWithSecret splits secret into shares and encrypts each share
-// to the corresponding recipient in recipients, where each entry is an
-// armored GPG/PGP public key. Encryption follows the "Encrypt / Decrypt with
-// PGP keys" recipe from the gopenpgp README: an armored public key is loaded
-// with crypto.NewKeyFromArmored, an encryption handle is built for that
-// recipient via pgp.Encryption().Recipient(...).New(), and the share is
-// encrypted with that handle's Encrypt method.
-func gpgGenerateDocWithSecret(secret []byte, recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
+func generateDocWithSecret(secret []byte, recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
 	plaintextShares, err := withSecretGenerateSecretShares(secret, requiredShares, len(recipients))
 	if err != nil {
 		return nil, err
 	}
-	pgp := crypto.PGP()
+	//pgp := crypto.PGP()
 	var outDoc ShareDoc
 	for i, recipient := range recipients {
-		publicKey, err := crypto.NewKeyFromArmored(string(recipient))
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse armored gpg public key: %w", err)
-		}
-		encHandle, err := pgp.Encryption().Recipient(publicKey).New()
-		if err != nil {
-			return nil, fmt.Errorf("unable to create gpg encryption handle: %w", err)
-		}
 		plaintextData := plaintextShares[i]
 		plaintextFP := sha512.Sum512(plaintextData)
-		pgpMessage, err := encHandle.Encrypt(plaintextData)
+		encData, keyType, err := encryptDataWithPublic(plaintextData, recipient)
 		if err != nil {
-			return nil, fmt.Errorf("unable to encrypt share: %w", err)
+			return nil, err
 		}
-		encData := pgpMessage.Bytes()
 
 		docShare := EncrypedShare{
 			Identifier:           identifiers[i],
 			EncryptedBlob:        encData,
 			PlaintextFingerPrint: plaintextFP[:],
-			KeyType:              KeyTypePGP,
+			KeyType:              keyType,
 			PublicKey:            recipient,
 		}
 		outDoc.Shares = append(outDoc.Shares, docShare)
