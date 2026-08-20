@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha512"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 
@@ -45,8 +46,14 @@ func GenerateNewDocFromAgeKeys(publicKeys []byte, identifiers []string, required
 	return nil, fmt.Errorf("not implemented")
 }
 
-func NewSSDocFromShareDocJSON([]byte) (*SssDoc, error) {
-	return nil, fmt.Errorf("not implemented")
+func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssDoc, error) {
+	var parsedDoc ShareDoc
+	err := json.Unmarshal(serializedDoc, &parsedDoc)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSSSDocFromShareDoc(&parsedDoc), nil
 }
 
 func NewSSSDocFromShareDoc(sd *ShareDoc) *SssDoc {

@@ -2,6 +2,7 @@ package sssdoc
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -190,7 +191,11 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
 
-	sssDoc := NewSSSDocFromShareDoc(shareDoc)
+	// Test serialization too
+	serializedShareDoc, err := json.Marshal(shareDoc)
+	require.NoError(t, err)
+	sssDoc, err := NewSSDocFromShareDocJSON(serializedShareDoc)
+	require.NoError(t, err)
 	require.NotNil(t, sssDoc)
 
 	found := false
