@@ -88,7 +88,7 @@ TwwRRi5pixdoq0c/mMUTS+fIB2Mxfl1LnajZcgg=
 
 // TODO add a pq key for the tests
 
-func TestAgeBase(t *testing.T) {
+func TestGenerateBase(t *testing.T) {
 
 	recipientsStrings := []string{
 		"age10hfzhu2hfw6wjn2vjjrqdke3yf5vzk9twwjz505tfv984tdegchs8kuwg6",
@@ -101,8 +101,9 @@ func TestAgeBase(t *testing.T) {
 		recipients = append(recipients, []byte(recipient))
 		identities[i] = fmt.Sprintf("%d", i)
 	}
+	_, err := GenerateNewDocFromKeysAndIdentifiers(recipients, identities, 2)
 
-	_, err := newFromAgeKeysInternal(recipients, identities, 2)
+	//_, err := newFromAgeKeysInternal(recipients, identities, 2)
 	require.NoError(t, err)
 }
 

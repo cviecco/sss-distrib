@@ -42,8 +42,12 @@ func NewSSSDoc() (*SssDoc, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func GenerateNewDocFromAgeKeys(publicKeys []byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
-	return nil, fmt.Errorf("not implemented")
+func GenerateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
+	secret, err := generateSecret()
+	if err != nil {
+		return nil, err
+	}
+	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
 func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssDoc, error) {
@@ -65,14 +69,6 @@ func NewSSSDocFromShareDoc(sd *ShareDoc) *SssDoc {
 }
 
 const randomStringEntropyBytes = 32
-
-func newFromAgeKeysInternal(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
-	secret, err := generateSecret()
-	if err != nil {
-		return nil, err
-	}
-	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
-}
 
 func encryptDataWithPublic(plaintextData []byte, recipientPublic []byte) ([]byte, int, error) {
 	publicForBuffer := bytes.Clone(recipientPublic)
