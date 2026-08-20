@@ -2,6 +2,7 @@ package sssdoc
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -87,7 +88,7 @@ TwwRRi5pixdoq0c/mMUTS+fIB2Mxfl1LnajZcgg=
 
 // TODO add a pq key for the tests
 
-func TestAgeBase(t *testing.T) {
+func TestGenerateBase(t *testing.T) {
 
 	recipientsStrings := []string{
 		"age10hfzhu2hfw6wjn2vjjrqdke3yf5vzk9twwjz505tfv984tdegchs8kuwg6",
@@ -100,8 +101,9 @@ func TestAgeBase(t *testing.T) {
 		recipients = append(recipients, []byte(recipient))
 		identities[i] = fmt.Sprintf("%d", i)
 	}
+	_, err := GenerateNewDocFromKeysAndIdentifiers(recipients, identities, 2)
 
-	_, err := newFromAgeKeysInternal(recipients, identities, 2)
+	//_, err := newFromAgeKeysInternal(recipients, identities, 2)
 	require.NoError(t, err)
 }
 
@@ -190,7 +192,11 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
 
-	sssDoc := NewSSSDocFromShareDoc(shareDoc)
+	// Test serialization too
+	serializedShareDoc, err := json.Marshal(shareDoc)
+	require.NoError(t, err)
+	sssDoc, err := NewSSDocFromShareDocJSON(serializedShareDoc)
+	require.NoError(t, err)
 	require.NotNil(t, sssDoc)
 
 	found := false

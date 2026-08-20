@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"crypto/sha512"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"filippo.io/age"
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
@@ -41,12 +43,50 @@ func NewSSSDoc() (*SssDoc, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func GenerateNewDocFromAgeKeys(publicKeys []byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
-	return nil, fmt.Errorf("not implemented")
+// utility function should be moved somewhere else
+func LoadMultifiles(paths []string) ([][]byte, error) {
+	var rvalue [][]byte
+	for _, filepath := range paths {
+		file, err := os.Open(filepath)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+		filebytes, err := io.ReadAll(file)
+		if err != nil {
+			return nil, err
+		}
+		rvalue = append(rvalue, filebytes)
+		file.Close() // to avoid having more than one opened file
+	}
+	return rvalue, nil
 }
 
-func NewSSDocFromShareDocJSON([]byte) (*SssDoc, error) {
-	return nil, fmt.Errorf("not implemented")
+// This should be changed to generate from the actual data
+func GenerateNewDocFromKeys(recipients [][]byte, requiredShares int) (*ShareDoc, error) {
+	var identifiers []string
+	for i, _ := range recipients {
+		identifiers = append(identifiers, fmt.Sprintf("%d", i))
+	}
+	return GenerateNewDocFromKeysAndIdentifiers(recipients, identifiers, requiredShares)
+}
+
+func GenerateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
+	secret, err := generateSecret()
+	if err != nil {
+		return nil, err
+	}
+	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
+}
+
+func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssDoc, error) {
+	var parsedDoc ShareDoc
+	err := json.Unmarshal(serializedDoc, &parsedDoc)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSSSDocFromShareDoc(&parsedDoc), nil
 }
 
 func NewSSSDocFromShareDoc(sd *ShareDoc) *SssDoc {
@@ -58,14 +98,6 @@ func NewSSSDocFromShareDoc(sd *ShareDoc) *SssDoc {
 }
 
 const randomStringEntropyBytes = 32
-
-func newFromAgeKeysInternal(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
-	secret, err := generateSecret()
-	if err != nil {
-		return nil, err
-	}
-	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
-}
 
 func encryptDataWithPublic(plaintextData []byte, recipientPublic []byte) ([]byte, int, error) {
 	publicForBuffer := bytes.Clone(recipientPublic)
