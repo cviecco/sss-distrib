@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 
 	"filippo.io/age"
@@ -223,4 +224,38 @@ func (sd *SssDoc) ProcessShare(plaintextShare []byte) ([]byte, error) {
 		return sd.sharedSecret, nil
 	}
 	return sd.sharedSecret, fmt.Errorf("Suggested Share does not match any fingerprint")
+}
+
+const httpReaderMaxBytes = 65535
+
+func (sd *SssDoc) serveShareDocHandlerInternal(w http.ResponseWriter, r *http.Request) error {
+	if sd.Doc == nil {
+		return fmt.Errorf("No loaded doc")
+	}
+	payload, err := json.Marshal(sd.Doc)
+	if err != nil {
+		return fmt.Errorf("unable to marshal Doc")
+	}
+	// all errors after this are due to network errors and are not recoverable
+	// this will be ignored
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(payload)
+	return nil
+}
+
+func (sd *SssDoc) ServeShareDocHandler(w http.ResponseWriter, r *http.Request) {
+	err := sd.serveShareDocHandlerInternal(w, r)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+	return
+}
+
+func (sd *SssDoc) ProcessPlaintextShareHandler(w http.ResponseWriter, r *http.Request) {
+	//Need to add some CSRF protection
+	r.Body = http.MaxBytesReader(w, r.Body, httpReaderMaxBytes)
+	if r.Method != http.MethodPost {
+		http.Error(w, "invalid method", http.StatusInternalServerError)
+	}
+
 }
