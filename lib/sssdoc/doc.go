@@ -37,6 +37,7 @@ type SssDoc struct {
 	sharedSecret   []byte
 	processedShare map[string][]byte
 	Doc            *ShareDoc
+	agePQKey       *age.HybridIdentity
 }
 
 func NewSSSDoc() (*SssDoc, error) {
@@ -87,15 +88,20 @@ func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssDoc, error) {
 		return nil, err
 	}
 
-	return NewSSSDocFromShareDoc(&parsedDoc), nil
+	return NewSSSDocFromShareDoc(&parsedDoc)
 }
 
-func NewSSSDocFromShareDoc(sd *ShareDoc) *SssDoc {
+func NewSSSDocFromShareDoc(sd *ShareDoc) (*SssDoc, error) {
 	rvalue := SssDoc{
 		Doc:            sd,
 		processedShare: make(map[string][]byte),
 	}
-	return &rvalue
+	var err error
+	rvalue.agePQKey, err = age.GenerateHybridIdentity()
+	if err != nil {
+		return nil, err
+	}
+	return &rvalue, nil
 }
 
 const randomStringEntropyBytes = 32
@@ -251,6 +257,13 @@ func (sd *SssDoc) ServeShareDocHandler(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+/*
+type shareHandlerParams struct {
+	PlaintextShare
+}
+*/
+
+// this one is anonymous
 func (sd *SssDoc) ProcessPlaintextShareHandler(w http.ResponseWriter, r *http.Request) {
 	//Need to add some CSRF protection
 	r.Body = http.MaxBytesReader(w, r.Body, httpReaderMaxBytes)

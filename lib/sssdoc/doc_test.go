@@ -145,7 +145,8 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
 
-	sssDoc := NewSSSDocFromShareDoc(shareDoc)
+	sssDoc, err := NewSSSDocFromShareDoc(shareDoc)
+	require.NoError(t, err)
 	require.NotNil(t, sssDoc)
 
 	found := false
