@@ -10,6 +10,8 @@ import (
 	"filippo.io/age"
 )
 
+const jsonResponseContentType = "application/json; charset=utf-8"
+
 type SssShareStatus struct {
 	Processed int `json:"processed"`
 	Required  int `json:"required"`
@@ -29,7 +31,7 @@ func (doc *SssDoc) GetShareStatusHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Type", jsonResponseContentType)
 	if _, err := w.Write(payload); err != nil {
 		// The client connection may have been closed; nothing else to do.
 		return

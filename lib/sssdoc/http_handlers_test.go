@@ -1,6 +1,7 @@
 package sssdoc
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http/httptest"
@@ -47,10 +48,20 @@ func TestGetShareStatusHandler(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	require.Equal(t, resp.StatusCode, 200)
 	//fmt.Println(resp.StatusCode)
-	fmt.Println(resp.Header.Get("Content-Type"))
-	fmt.Println(string(body))
+	//fmt.Println(resp.Header.Get("Content-Type"))
+	//fmt.Println(string(body))
 
-	//TODO: deserialize and esure it makes sense
+	//content type check
+	require.Equal(t, resp.Header.Get("Content-Type"), jsonResponseContentType)
+
+	// Data check
+	var status SssShareStatus
+	err = json.Unmarshal(body, &status)
+	require.NoError(t, err)
+
+	require.Equal(t, status.Required, 2)
+	require.Equal(t, status.Processed, 0)
+
 }
 
 func TestGetKeyExchangePublicKeysHandler(t *testing.T) {
