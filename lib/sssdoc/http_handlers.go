@@ -17,7 +17,7 @@ type SssShareStatus struct {
 	Required  int `json:"required"`
 }
 
-func (doc *SssDoc) GetShareStatusHandler(w http.ResponseWriter, r *http.Request) {
+func (doc *SssProcessor) GetShareStatusHandler(w http.ResponseWriter, r *http.Request) {
 	if doc.Doc == nil {
 		http.Error(w, "internal service error", http.StatusInternalServerError)
 		return
@@ -42,7 +42,7 @@ type SssKexchangeKeys struct {
 	AgePubKeys []string `json:"age_pub_keys"`
 }
 
-func (doc *SssDoc) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, r *http.Request) {
+func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, r *http.Request) {
 	pubAgeString := doc.agePQKey.Recipient().String()
 	payload, err := json.Marshal(SssKexchangeKeys{
 		AgePubKeys: []string{pubAgeString},
@@ -62,7 +62,7 @@ type processEncrypedShareParams struct {
 	EncrypedShare []byte
 }
 
-func (doc *SssDoc) ProcessEncryptedShareFromParams(params processEncrypedShareParams) error {
+func (doc *SssProcessor) ProcessEncryptedShareFromParams(params processEncrypedShareParams) error {
 	//decrpt the share
 	agePQrecipient := doc.agePQKey.Recipient()
 	idReader := bytes.NewReader([]byte(agePQrecipient.String()))
@@ -86,6 +86,6 @@ func (doc *SssDoc) ProcessEncryptedShareFromParams(params processEncrypedSharePa
 	return err
 }
 
-func (doc *SssDoc) ProcessKeyShareHandler(w http.ResponseWriter, r *http.Request) {
+func (doc *SssProcessor) ProcessKeyShareHandler(w http.ResponseWriter, r *http.Request) {
 	//Parse params
 }

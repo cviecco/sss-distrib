@@ -33,14 +33,14 @@ type ShareDoc struct {
 	RequiredShares int
 }
 
-type SssDoc struct {
+type SssProcessor struct {
 	sharedSecret   []byte
 	processedShare map[string][]byte
 	Doc            *ShareDoc
 	agePQKey       *age.HybridIdentity
 }
 
-func NewSSSDoc() (*SssDoc, error) {
+func NewSSSDoc() (*SssProcessor, error) {
 
 	return nil, fmt.Errorf("not implemented")
 }
@@ -81,7 +81,7 @@ func GenerateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []str
 	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
-func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssDoc, error) {
+func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssProcessor, error) {
 	var parsedDoc ShareDoc
 	err := json.Unmarshal(serializedDoc, &parsedDoc)
 	if err != nil {
@@ -91,8 +91,8 @@ func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssDoc, error) {
 	return NewSSSDocFromShareDoc(&parsedDoc)
 }
 
-func NewSSSDocFromShareDoc(sd *ShareDoc) (*SssDoc, error) {
-	rvalue := SssDoc{
+func NewSSSDocFromShareDoc(sd *ShareDoc) (*SssProcessor, error) {
+	rvalue := SssProcessor{
 		Doc:            sd,
 		processedShare: make(map[string][]byte),
 	}
@@ -200,7 +200,7 @@ func gpgDecryptSingleShare(share EncrypedShare, armoredPrivate []byte, passphras
 	return decrypted.Bytes(), nil
 }
 
-func (sd *SssDoc) ProcessShare(plaintextShare []byte) ([]byte, error) {
+func (sd *SssProcessor) ProcessShare(plaintextShare []byte) ([]byte, error) {
 	shareFP := sha512.Sum512(plaintextShare)
 	b64ShareFP := base64.StdEncoding.EncodeToString(shareFP[:])
 
@@ -234,7 +234,7 @@ func (sd *SssDoc) ProcessShare(plaintextShare []byte) ([]byte, error) {
 
 const httpReaderMaxBytes = 65535
 
-func (sd *SssDoc) serveShareDocHandlerInternal(w http.ResponseWriter, r *http.Request) error {
+func (sd *SssProcessor) serveShareDocHandlerInternal(w http.ResponseWriter, r *http.Request) error {
 	if sd.Doc == nil {
 		return fmt.Errorf("No loaded doc")
 	}
@@ -249,7 +249,7 @@ func (sd *SssDoc) serveShareDocHandlerInternal(w http.ResponseWriter, r *http.Re
 	return nil
 }
 
-func (sd *SssDoc) ServeShareDocHandler(w http.ResponseWriter, r *http.Request) {
+func (sd *SssProcessor) ServeShareDocHandler(w http.ResponseWriter, r *http.Request) {
 	err := sd.serveShareDocHandlerInternal(w, r)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -264,7 +264,7 @@ type shareHandlerParams struct {
 */
 
 // this one is anonymous
-func (sd *SssDoc) ProcessPlaintextShareHandler(w http.ResponseWriter, r *http.Request) {
+func (sd *SssProcessor) ProcessPlaintextShareHandler(w http.ResponseWriter, r *http.Request) {
 	//Need to add some CSRF protection
 	r.Body = http.MaxBytesReader(w, r.Body, httpReaderMaxBytes)
 	if r.Method != http.MethodPost {

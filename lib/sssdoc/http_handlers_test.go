@@ -14,7 +14,7 @@ import (
 // generate
 // get public keys
 
-func generateBaseTestingDoc(t *testing.T) ([]byte, *SssDoc, error) {
+func generateBaseTestingDoc(t *testing.T) ([]byte, *SssProcessor, error) {
 	secret, err := generateSecret()
 	require.NoError(t, err)
 
