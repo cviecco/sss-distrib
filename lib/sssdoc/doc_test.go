@@ -145,7 +145,8 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
 
-	sssDoc := NewSSSDocFromShareDoc(shareDoc)
+	sssDoc, err := NewProcessorFromShareDoc(shareDoc)
+	require.NoError(t, err)
 	require.NotNil(t, sssDoc)
 
 	found := false
@@ -195,7 +196,7 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 	// Test serialization too
 	serializedShareDoc, err := json.Marshal(shareDoc)
 	require.NoError(t, err)
-	sssDoc, err := NewSSDocFromShareDocJSON(serializedShareDoc)
+	sssDoc, err := NewProcessorFromShareDocJSON(serializedShareDoc)
 	require.NoError(t, err)
 	require.NotNil(t, sssDoc)
 

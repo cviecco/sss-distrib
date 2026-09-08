@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 
 	"filippo.io/age"
@@ -32,13 +33,14 @@ type ShareDoc struct {
 	RequiredShares int
 }
 
-type SssDoc struct {
+type SssProcessor struct {
 	sharedSecret   []byte
 	processedShare map[string][]byte
 	Doc            *ShareDoc
+	agePQKey       *age.HybridIdentity
 }
 
-func NewSSSDoc() (*SssDoc, error) {
+func NewSSSDoc() (*SssProcessor, error) {
 
 	return nil, fmt.Errorf("not implemented")
 }
@@ -79,22 +81,27 @@ func GenerateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []str
 	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
-func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssDoc, error) {
+func NewProcessorFromShareDocJSON(serializedDoc []byte) (*SssProcessor, error) {
 	var parsedDoc ShareDoc
 	err := json.Unmarshal(serializedDoc, &parsedDoc)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewSSSDocFromShareDoc(&parsedDoc), nil
+	return NewProcessorFromShareDoc(&parsedDoc)
 }
 
-func NewSSSDocFromShareDoc(sd *ShareDoc) *SssDoc {
-	rvalue := SssDoc{
+func NewProcessorFromShareDoc(sd *ShareDoc) (*SssProcessor, error) {
+	rvalue := SssProcessor{
 		Doc:            sd,
 		processedShare: make(map[string][]byte),
 	}
-	return &rvalue
+	var err error
+	rvalue.agePQKey, err = age.GenerateHybridIdentity()
+	if err != nil {
+		return nil, err
+	}
+	return &rvalue, nil
 }
 
 const randomStringEntropyBytes = 32
@@ -193,7 +200,7 @@ func gpgDecryptSingleShare(share EncrypedShare, armoredPrivate []byte, passphras
 	return decrypted.Bytes(), nil
 }
 
-func (sd *SssDoc) ProcessShare(plaintextShare []byte) ([]byte, error) {
+func (sd *SssProcessor) ProcessShare(plaintextShare []byte) ([]byte, error) {
 	shareFP := sha512.Sum512(plaintextShare)
 	b64ShareFP := base64.StdEncoding.EncodeToString(shareFP[:])
 
@@ -223,4 +230,45 @@ func (sd *SssDoc) ProcessShare(plaintextShare []byte) ([]byte, error) {
 		return sd.sharedSecret, nil
 	}
 	return sd.sharedSecret, fmt.Errorf("Suggested Share does not match any fingerprint")
+}
+
+const httpReaderMaxBytes = 65535
+
+func (sd *SssProcessor) serveShareDocHandlerInternal(w http.ResponseWriter, r *http.Request) error {
+	if sd.Doc == nil {
+		return fmt.Errorf("No loaded doc")
+	}
+	payload, err := json.Marshal(sd.Doc)
+	if err != nil {
+		return fmt.Errorf("unable to marshal Doc")
+	}
+	// all errors after this are due to network errors and are not recoverable
+	// this will be ignored
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(payload)
+	return nil
+}
+
+func (sd *SssProcessor) ServeShareDocHandler(w http.ResponseWriter, r *http.Request) {
+	err := sd.serveShareDocHandlerInternal(w, r)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+	return
+}
+
+/*
+type shareHandlerParams struct {
+	PlaintextShare
+}
+*/
+
+// this one is anonymous
+func (sd *SssProcessor) ProcessPlaintextShareHandler(w http.ResponseWriter, r *http.Request) {
+	//Need to add some CSRF protection
+	r.Body = http.MaxBytesReader(w, r.Body, httpReaderMaxBytes)
+	if r.Method != http.MethodPost {
+		http.Error(w, "invalid method", http.StatusInternalServerError)
+	}
+
 }
