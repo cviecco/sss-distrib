@@ -81,17 +81,17 @@ func GenerateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []str
 	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
-func NewSSDocFromShareDocJSON(serializedDoc []byte) (*SssProcessor, error) {
+func NewProcessorFromShareDocJSON(serializedDoc []byte) (*SssProcessor, error) {
 	var parsedDoc ShareDoc
 	err := json.Unmarshal(serializedDoc, &parsedDoc)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewSSSDocFromShareDoc(&parsedDoc)
+	return NewProcessorFromShareDoc(&parsedDoc)
 }
 
-func NewSSSDocFromShareDoc(sd *ShareDoc) (*SssProcessor, error) {
+func NewProcessorFromShareDoc(sd *ShareDoc) (*SssProcessor, error) {
 	rvalue := SssProcessor{
 		Doc:            sd,
 		processedShare: make(map[string][]byte),

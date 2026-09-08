@@ -32,7 +32,7 @@ func generateBaseTestingDoc(t *testing.T) ([]byte, *SssProcessor, error) {
 	requiredShares := 2
 	shareDoc, err := generateDocWithSecret(secret, recipients, identities, requiredShares)
 	require.NoError(t, err)
-	sssdoc, err := NewSSSDocFromShareDoc(shareDoc)
+	sssdoc, err := NewProcessorFromShareDoc(shareDoc)
 	require.NoError(t, err)
 	return secret, sssdoc, nil
 }
