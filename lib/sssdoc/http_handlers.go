@@ -2,6 +2,7 @@ package sssdoc
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,30 +63,67 @@ type processEncrypedShareParams struct {
 	EncrypedShare []byte
 }
 
-func (doc *SssProcessor) ProcessEncryptedShareFromParams(params processEncrypedShareParams) error {
+func (doc *SssProcessor) ProcessEncryptedShareFromParams(params processEncrypedShareParams) (usererr error, internalerr error) {
 	//decrpt the share
-	agePQrecipient := doc.agePQKey.Recipient()
+	agePQrecipient := doc.agePQKey
 	idReader := bytes.NewReader([]byte(agePQrecipient.String()))
 	identity, err := age.ParseIdentities(idReader)
 	if err != nil {
 		// TODO, dont do the +%v
-		return fmt.Errorf("unable to decrypt  %w", err)
+		return nil, fmt.Errorf("unable to decrypt parse identities fail  %w", err)
 	}
 	encReader := bytes.NewReader(params.EncrypedShare)
 	plaintextReader, err := age.Decrypt(encReader, identity...)
 	if err != nil {
 		// TODO, dont do the +%v
-		return fmt.Errorf("unable to decrypt  %w", err)
+		return fmt.Errorf("unable to decrypt  %w", err), nil
 	}
 	plaintextShare, err := io.ReadAll(plaintextReader)
 	if err != nil {
 		// TODO, dont do the +%v
-		return fmt.Errorf("unable to readdecrypted bytes  %w", err)
+		return nil, fmt.Errorf("unable to readdecrypted bytes  %w", err)
 	}
 	_, err = doc.ProcessShare(plaintextShare)
-	return err
+	return nil, err
 }
 
-func (doc *SssProcessor) ProcessKeyShareHandler(w http.ResponseWriter, r *http.Request) {
-	//Parse params
+func (sp *SssProcessor) ParseEncryptedShareFromParams(w http.ResponseWriter, r *http.Request) (*processEncrypedShareParams, error) {
+	err := r.ParseForm()
+	if err != nil {
+		return nil, err
+	}
+	//fmt.Printf("parsing r==%+v", r)
+	b64EncShare := r.FormValue("b64encShare")
+	if b64EncShare == "" {
+		return nil, fmt.Errorf("Missing required value  'b64encShare'")
+	}
+
+	var rvalue processEncrypedShareParams
+	rvalue.EncrypedShare, err = base64.URLEncoding.DecodeString(b64EncShare)
+	if err != nil {
+		return nil, fmt.Errorf("String is not b64 URL encoded %w", err)
+	}
+	return &rvalue, nil
+}
+
+// Keys should always be passed encrypted
+func (sp *SssProcessor) ProcessKeyShareHandler(w http.ResponseWriter, r *http.Request) {
+	/// wrap in limited reader?
+	params, err := sp.ParseEncryptedShareFromParams(w, r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Bad/Invalid params: %s ", err), http.StatusBadRequest)
+		return
+	}
+	userErr, err := sp.ProcessEncryptedShareFromParams(*params)
+	if userErr != nil {
+		http.Error(w, fmt.Sprintf("Bad/Invalid params: %s ", err), http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		fmt.Printf("internal err=%s", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	//On success we just return the status doc
+	sp.GetShareStatusHandler(w, r)
 }
