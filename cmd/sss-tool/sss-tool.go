@@ -6,7 +6,10 @@ import (
 	"io"
 	"os"
 
+	"golang.org/x/term"
+
 	"github.com/alecthomas/kong"
+	"github.com/cviecco/sss-distrib/lib/client"
 	"github.com/cviecco/sss-distrib/lib/sssdoc"
 )
 
@@ -51,6 +54,45 @@ func (gd *GenDocCmd) Run(ctx *Context) error {
 	return nil
 }
 
+type GenNewEncAgeKey struct {
+	OutputPath string `arg:"" name:"output" help:"FileOutputPath." type:"path"`
+}
+
+func (gnak *GenNewEncAgeKey) Run(ctx *Context) error {
+	// 1. get passwd from terminal
+	// 2. run generate
+	// 3. getpublic from key
+	// 4. writepublic to file
+
+	// TODO generate passphrase on empty
+	fmt.Println("please enter your passphrase:")
+	pass, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return err
+	}
+	sdclient, err := client.NewAgeKeyWithPassPhrase(gnak.OutputPath, string(pass), "someurl")
+	if err != nil {
+		return err
+	}
+	publicKeyBytes, err := sdclient.GetPublicKey()
+	if err != nil {
+		return err
+	}
+	pubkeyPath := gnak.OutputPath + ".pub"
+	pubFile, err := os.OpenFile(pubkeyPath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer pubFile.Close()
+	_, err = pubFile.Write(publicKeyBytes)
+	if err != nil {
+		return err
+	}
+	return nil
+
+	//return fmt.Errorf("not implemented")
+}
+
 type RmCmd struct {
 	Force     bool `help:"Force removal."`
 	Recursive bool `help:"Recursively remove files."`
@@ -75,9 +117,10 @@ func (l *LsCmd) Run(ctx *Context) error {
 var cli struct {
 	Debug bool `help:"Enable debug mode."`
 
-	Rm     RmCmd     `cmd:"" help:"Remove files."`
-	Ls     LsCmd     `cmd:"" help:"List paths."`
-	GenDoc GenDocCmd `cmd:"" help:"Generate SSS document."`
+	Rm     RmCmd           `cmd:"" help:"Remove files."`
+	Ls     LsCmd           `cmd:"" help:"List paths."`
+	GenDoc GenDocCmd       `cmd:"" help:"Generate SSS document."`
+	GenAge GenNewEncAgeKey `cmd:"" help:"Generate New Encypte Age key and public key files."`
 }
 
 func main() {
