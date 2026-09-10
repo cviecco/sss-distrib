@@ -38,4 +38,12 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 	// PrivateKeys should match
 	require.Equal(t, sc1.ptPrivateKey, sc2.ptPrivateKey)
 
+	//Public keys must match
+	pub1, err := sc1.GetPublicKey()
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(string(pub1), "age1"))
+	pub2, err := sc2.GetPublicKey()
+	require.NoError(t, err)
+	require.Equal(t, pub1, pub2)
+
 }
