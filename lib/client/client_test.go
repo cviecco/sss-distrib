@@ -1,15 +1,16 @@
 package client
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
 const testPassphrase = "12345" // same as my lugggage
+const ageArmorPrefix = "-----BEGIN AGE ENCRYPTED FILE-----"
 
 func TestSimpleFileRoundTripAge(t *testing.T) {
 	dir, err := os.MkdirTemp("", "example")
@@ -23,9 +24,12 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, sc1)
 
+	//minor saniry check
 	filedata, err := os.ReadFile(filename)
 	require.NoError(t, err)
-	fmt.Printf("filedata=%s", string(filedata))
+	require.True(t, strings.HasPrefix(string(filedata), ageArmorPrefix))
+
+	//fmt.Printf("filedata=%s", string(filedata))
 
 	sc2, err := LoadAgeKeyWithPassPhrase(filename, testPassphrase)
 	require.NoError(t, err)

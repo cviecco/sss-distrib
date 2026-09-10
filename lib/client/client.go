@@ -22,6 +22,7 @@ func mainx() {
 type ssdClient struct {
 	BaseURL      string
 	ptPrivateKey []byte //serialized key in plaintext
+
 	//passphrase   string
 	filePath string
 	keyType  int // should be an enum
@@ -45,6 +46,7 @@ func NewAgeKeyWithPassPhrase(outPath string, passphrase string, urlBase string) 
 	defer out.Close()
 
 	sc.ptPrivateKey = []byte(agePQKey.String())
+
 	in := bytes.NewReader(sc.ptPrivateKey)
 	// now lets wrap the key
 
@@ -125,5 +127,14 @@ func ageDecrypt(in io.Reader, out io.Writer, identities ...age.Identity) error {
 		return err
 	}
 	return nil
+}
+
+func (sdc *ssdClient) GetPublicKey() ([]byte, error) {
+	pqident, err := age.ParseHybridIdentity(string(sdc.ptPrivateKey))
+	if err != nil {
+		return nil, err
+	}
+	publicKey := pqident.Recipient().String()
+	return []byte(publicKey), nil
 
 }
