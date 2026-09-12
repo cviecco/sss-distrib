@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"filippo.io/age"
 )
@@ -59,6 +60,73 @@ func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, 
 	}
 }
 
+type DataMessage struct {
+	Epoch   int64  `json:"iat"` //Reduces some prevent replay attacks within the trust window
+	Target  string `json:"sub"`
+	Payload []byte `json:"payload"`
+}
+
+func NewAgeEncryptedMessage(payload []byte, publickey []byte, subject string) ([]byte, error) {
+	return newAgeEncryptedMessageInternal(payload, publickey, subject, time.Now())
+}
+
+func newAgeEncryptedMessageInternal(payload []byte, pubicKey []byte, subject string, sentTime time.Time) ([]byte, error) {
+	Message := DataMessage{
+		Payload: payload,
+		Target:  subject,
+		Epoch:   sentTime.Unix(),
+	}
+	serializedMessage, err := json.Marshal(Message)
+	if err != nil {
+		return nil, err
+	}
+	encMessage, _, err := encryptDataWithPublic(serializedMessage, pubicKey)
+	if err != nil {
+		return nil, err
+	}
+	return encMessage, nil
+}
+
+// Returns the payload
+func DecryptValidateAgeMessage(encryptedMessage []byte, privateKey []byte, subject string) ([]byte, error) {
+	return decryptValidateAgeMessageInternal(encryptedMessage, privateKey, subject, time.Now())
+}
+
+func decryptValidateAgeMessageInternal(encryptedMessage []byte, privateKey []byte, subject string, evalTime time.Time) ([]byte, error) {
+	idReader := bytes.NewReader(privateKey)
+	identity, err := age.ParseIdentities(idReader)
+	if err != nil {
+		return nil, err
+	}
+	encReader := bytes.NewReader(encryptedMessage)
+	plaintextReader, err := age.Decrypt(encReader, identity...)
+	if err != nil {
+		return nil, err
+	}
+	serializedMessage, err := io.ReadAll(plaintextReader)
+	if err != nil {
+		return nil, err
+	}
+	var message DataMessage
+	err = json.Unmarshal(serializedMessage, &message)
+	if err != nil {
+		return nil, err
+	}
+	//Now validate
+	if message.Target != subject {
+		return nil, fmt.Errorf("invalid target")
+	}
+	currentEpoch := evalTime.Unix()
+	deltaEpoch := currentEpoch - message.Epoch
+	if deltaEpoch > 30 {
+		return nil, fmt.Errorf("Message too old")
+	}
+	if deltaEpoch < (-30) {
+		return nil, fmt.Errorf("Message too new")
+	}
+	return message.Payload, nil
+}
+
 type processEncrypedShareParams struct {
 	EncrypedShare []byte
 }
@@ -83,9 +151,13 @@ func (doc *SssProcessor) ProcessEncryptedShareFromParams(params processEncrypedS
 		// TODO, dont do the +%v
 		return nil, fmt.Errorf("unable to readdecrypted bytes  %w", err)
 	}
+	// Here we check for replay + id
+
 	_, err = doc.ProcessShare(plaintextShare)
 	return nil, err
 }
+
+const encMessageKey = "b64encShare"
 
 func (sp *SssProcessor) ParseEncryptedShareFromParams(w http.ResponseWriter, r *http.Request) (*processEncrypedShareParams, error) {
 	err := r.ParseForm()
@@ -93,9 +165,9 @@ func (sp *SssProcessor) ParseEncryptedShareFromParams(w http.ResponseWriter, r *
 		return nil, err
 	}
 	//fmt.Printf("parsing r==%+v", r)
-	b64EncShare := r.FormValue("b64encShare")
+	b64EncShare := r.FormValue(encMessageKey)
 	if b64EncShare == "" {
-		return nil, fmt.Errorf("Missing required value  'b64encShare'")
+		return nil, fmt.Errorf("Missing required value  '%s'", encMessageKey)
 	}
 
 	var rvalue processEncrypedShareParams

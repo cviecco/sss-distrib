@@ -45,5 +45,4 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 	pub2, err := sc2.GetPublicKey()
 	require.NoError(t, err)
 	require.Equal(t, pub1, pub2)
-
 }

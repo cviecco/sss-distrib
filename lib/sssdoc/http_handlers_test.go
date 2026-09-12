@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"filippo.io/age"
 	"github.com/stretchr/testify/require"
@@ -111,7 +112,7 @@ func TestProcessEncryptedShareFromParamsSuccess(t *testing.T) {
 		encShare, _, err := encryptDataWithPublic(ptShare, []byte(sd.agePQKey.Recipient().String()))
 		require.NoError(t, err)
 		b64EncShare := base64.URLEncoding.EncodeToString(encShare)
-		values := url.Values{"b64encShare": []string{b64EncShare}}
+		values := url.Values{encMessageKey: []string{b64EncShare}}
 		req := httptest.NewRequest("POST", "/", strings.NewReader(values.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		w := httptest.NewRecorder()
@@ -127,5 +128,34 @@ func TestProcessEncryptedShareFromParamsSuccess(t *testing.T) {
 
 		require.Equal(t, len(sd.processedShare), i+1)
 	}
+
+}
+
+func TestEncryptDecryptMessage(t *testing.T) {
+	//hybridKey, err := age.New
+
+	// First valid round trip
+	agePQKey, err := age.GenerateHybridIdentity()
+	require.NoError(t, err)
+	payloadText := "hello"
+	messageSubject := "target1"
+	encMessage, err := NewAgeEncryptedMessage([]byte(payloadText), []byte(agePQKey.Recipient().String()), messageSubject)
+	require.NoError(t, err)
+	//now the return
+	payload, err := DecryptValidateAgeMessage(encMessage, []byte(agePQKey.String()), messageSubject)
+	require.NoError(t, err)
+	require.Equal(t, payloadText, string(payload))
+
+	// now with busted subject
+	_, err = DecryptValidateAgeMessage(encMessage, []byte(agePQKey.Recipient().String()), "randomSubject")
+	require.Error(t, err)
+
+	//now with a time in the future
+	_, err = decryptValidateAgeMessageInternal(encMessage, []byte(agePQKey.Recipient().String()), messageSubject, time.Now().Add(time.Hour))
+	require.Error(t, err)
+
+	//now with a time in the past
+	_, err = decryptValidateAgeMessageInternal(encMessage, []byte(agePQKey.Recipient().String()), messageSubject, time.Now().Add(-1*time.Hour))
+	require.Error(t, err)
 
 }

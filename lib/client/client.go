@@ -136,5 +136,14 @@ func (sdc *ssdClient) GetPublicKey() ([]byte, error) {
 	}
 	publicKey := pqident.Recipient().String()
 	return []byte(publicKey), nil
+}
 
+func (sdc *ssdClient) PushShareToServer() error {
+	// check if ready (plaintext key loaded)
+	// get the server doc
+	// get the server pub
+	// compute encrypted share
+	// post encrypted share to server
+
+	return fmt.Errorf("not implemented")
 }
