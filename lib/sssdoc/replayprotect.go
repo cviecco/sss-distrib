@@ -11,6 +11,10 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
+type replayChecker interface {
+	CheckReplayExists(in []byte) bool
+}
+
 const replayByteSize = 16
 const defaultRPDuration = time.Second * 5
 const defautMaxRPAge = time.Second * 45

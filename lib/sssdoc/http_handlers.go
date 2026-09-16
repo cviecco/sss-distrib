@@ -41,13 +41,21 @@ func (doc *SssProcessor) GetShareStatusHandler(w http.ResponseWriter, r *http.Re
 }
 
 type SssKexchangeKeys struct {
-	AgePubKeys []string `json:"age_pub_keys"`
+	AgePubKeys  []string `json:"age_pub_keys"`
+	ReplayNonce string   `json:"replay_nonce"`
 }
 
 func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, r *http.Request) {
+	replayNonce, err := doc.rProtector.GetProtectorBytes()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	b64replayNonce := base64.StdEncoding.EncodeToString(replayNonce)
 	pubAgeString := doc.agePQKey.Recipient().String()
 	payload, err := json.Marshal(SssKexchangeKeys{
-		AgePubKeys: []string{pubAgeString},
+		AgePubKeys:  []string{pubAgeString},
+		ReplayNonce: b64replayNonce,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -61,20 +69,22 @@ func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, 
 }
 
 type DataMessage struct {
-	Epoch   int64  `json:"iat"` //Reduces some prevent replay attacks within the trust window
+	Epoch   int64  `json:"iat"` //To  prevent replay attacks outside the trust window
+	ReplayN string `json:"snonce"`
 	Target  string `json:"sub"`
 	Payload []byte `json:"payload"`
 }
 
-func NewAgeEncryptedMessage(payload []byte, publickey []byte, subject string) ([]byte, error) {
-	return newAgeEncryptedMessageInternal(payload, publickey, subject, time.Now())
+func NewAgeEncryptedMessage(payload []byte, publickey []byte, subject string, rpNonce string) ([]byte, error) {
+	return newAgeEncryptedMessageInternal(payload, publickey, subject, rpNonce, time.Now())
 }
 
-func newAgeEncryptedMessageInternal(payload []byte, pubicKey []byte, subject string, sentTime time.Time) ([]byte, error) {
+func newAgeEncryptedMessageInternal(payload []byte, pubicKey []byte, subject string, rpNonce string, sentTime time.Time) ([]byte, error) {
 	Message := DataMessage{
 		Payload: payload,
 		Target:  subject,
 		Epoch:   sentTime.Unix(),
+		ReplayN: rpNonce,
 	}
 	serializedMessage, err := json.Marshal(Message)
 	if err != nil {
@@ -88,11 +98,11 @@ func newAgeEncryptedMessageInternal(payload []byte, pubicKey []byte, subject str
 }
 
 // Returns the payload
-func DecryptValidateAgeMessage(encryptedMessage []byte, privateKey []byte, subject string) ([]byte, error) {
-	return decryptValidateAgeMessageInternal(encryptedMessage, privateKey, subject, time.Now())
+func DecryptValidateAgeMessage(encryptedMessage []byte, privateKey []byte, subject string, rpchecker replayChecker) ([]byte, error) {
+	return decryptValidateAgeMessageInternal(encryptedMessage, privateKey, subject, rpchecker, time.Now())
 }
 
-func decryptValidateAgeMessageInternal(encryptedMessage []byte, privateKey []byte, subject string, evalTime time.Time) ([]byte, error) {
+func decryptValidateAgeMessageInternal(encryptedMessage []byte, privateKey []byte, subject string, rpchecker replayChecker, evalTime time.Time) ([]byte, error) {
 	idReader := bytes.NewReader(privateKey)
 	identity, err := age.ParseIdentities(idReader)
 	if err != nil {
@@ -116,14 +126,24 @@ func decryptValidateAgeMessageInternal(encryptedMessage []byte, privateKey []byt
 	if message.Target != subject {
 		return nil, fmt.Errorf("invalid target")
 	}
-	currentEpoch := evalTime.Unix()
-	deltaEpoch := currentEpoch - message.Epoch
-	if deltaEpoch > 30 {
-		return nil, fmt.Errorf("Message too old")
+	rawReplay, err := base64.StdEncoding.DecodeString(message.ReplayN)
+	if err != nil {
+		return nil, fmt.Errorf("invalid nonce encoding")
 	}
-	if deltaEpoch < (-30) {
-		return nil, fmt.Errorf("Message too new")
+	replayPass := rpchecker.CheckReplayExists(rawReplay)
+	if !replayPass {
+		return nil, fmt.Errorf("unknown/bad replace nonce")
 	}
+	/*
+		currentEpoch := evalTime.Unix()
+		deltaEpoch := currentEpoch - message.Epoch
+		if deltaEpoch > 30 {
+			return nil, fmt.Errorf("Message too old")
+		}
+		if deltaEpoch < (-30) {
+			return nil, fmt.Errorf("Message too new")
+		}
+	*/
 	return message.Payload, nil
 }
 

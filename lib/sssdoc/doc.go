@@ -40,8 +40,10 @@ type SssProcessor struct {
 	processedShare map[string][]byte
 	// TODO add data mutex
 
-	Doc           *ShareDoc
-	agePQKey      *age.HybridIdentity
+	Doc        *ShareDoc
+	agePQKey   *age.HybridIdentity
+	rProtector *replayProtector
+
 	messageNonces [][]byte
 	nonceMutex    sync.Mutex
 }
@@ -104,6 +106,10 @@ func NewProcessorFromShareDoc(sd *ShareDoc) (*SssProcessor, error) {
 	}
 	var err error
 	rvalue.agePQKey, err = age.GenerateHybridIdentity()
+	if err != nil {
+		return nil, err
+	}
+	rvalue.rProtector, err = NewReplayProtector()
 	if err != nil {
 		return nil, err
 	}

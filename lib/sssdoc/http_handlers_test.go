@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-	"time"
 
 	"filippo.io/age"
 	"github.com/stretchr/testify/require"
@@ -137,25 +136,34 @@ func TestEncryptDecryptMessage(t *testing.T) {
 	// First valid round trip
 	agePQKey, err := age.GenerateHybridIdentity()
 	require.NoError(t, err)
+
+	rprotector, err := NewReplayProtector()
+	require.NoError(t, err)
+
 	payloadText := "hello"
 	messageSubject := "target1"
-	encMessage, err := NewAgeEncryptedMessage([]byte(payloadText), []byte(agePQKey.Recipient().String()), messageSubject)
+	nonce, err := rprotector.GetProtectorBytes()
+	require.NoError(t, err)
+	b64nonce := base64.StdEncoding.EncodeToString(nonce)
+
+	encMessage, err := NewAgeEncryptedMessage([]byte(payloadText),
+		[]byte(agePQKey.Recipient().String()), messageSubject, b64nonce)
 	require.NoError(t, err)
 	//now the return
-	payload, err := DecryptValidateAgeMessage(encMessage, []byte(agePQKey.String()), messageSubject)
+	payload, err := DecryptValidateAgeMessage(encMessage, []byte(agePQKey.String()), messageSubject, rprotector)
 	require.NoError(t, err)
 	require.Equal(t, payloadText, string(payload))
 
 	// now with busted subject
-	_, err = DecryptValidateAgeMessage(encMessage, []byte(agePQKey.Recipient().String()), "randomSubject")
+	_, err = DecryptValidateAgeMessage(encMessage, []byte(agePQKey.Recipient().String()), "randomSubject", rprotector)
 	require.Error(t, err)
 
-	//now with a time in the future
-	_, err = decryptValidateAgeMessageInternal(encMessage, []byte(agePQKey.Recipient().String()), messageSubject, time.Now().Add(time.Hour))
-	require.Error(t, err)
-
-	//now with a time in the past
-	_, err = decryptValidateAgeMessageInternal(encMessage, []byte(agePQKey.Recipient().String()), messageSubject, time.Now().Add(-1*time.Hour))
+	// Now with invalid nonce
+	invalidNonceencMessage, err := NewAgeEncryptedMessage([]byte(payloadText),
+		[]byte(agePQKey.Recipient().String()), messageSubject,
+		base64.StdEncoding.EncodeToString([]byte("1234")))
+	_, err = DecryptValidateAgeMessage(invalidNonceencMessage,
+		[]byte(agePQKey.String()), messageSubject, rprotector)
 	require.Error(t, err)
 
 }
