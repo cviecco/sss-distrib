@@ -200,7 +200,7 @@ func generateDocWithSecret(secret []byte, recipients [][]byte, identifiers []str
 	return &outDoc, nil
 }
 
-func ageDecryptSingleShare(share EncrypedShare, identities []age.Identity) ([]byte, error) {
+func AgeDecryptSingleShare(share EncrypedShare, identities []age.Identity) ([]byte, error) {
 	encReader := bytes.NewReader(share.EncryptedBlob)
 	plaintextReader, err := age.Decrypt(encReader, identities...)
 	if err != nil {

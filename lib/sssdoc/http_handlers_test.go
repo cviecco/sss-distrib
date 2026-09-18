@@ -104,14 +104,14 @@ func TestProcessEncryptedShareFromParamsSuccess(t *testing.T) {
 	for i, x25519ident := range x25519identities {
 		idReader := bytes.NewReader([]byte(x25519ident.String()))
 		identity, err := age.ParseIdentities(idReader)
-		ptShare, err := ageDecryptSingleShare(sd.Doc.Shares[i], identity)
+		ptShare, err := AgeDecryptSingleShare(sd.Doc.Shares[i], identity)
 		require.NoError(t, err)
 
 		//With the now we encrypt the plaintextshare with the sd key
 		encShare, _, err := encryptDataWithPublic(ptShare, []byte(sd.agePQKey.Recipient().String()))
 		require.NoError(t, err)
 		b64EncShare := base64.URLEncoding.EncodeToString(encShare)
-		values := url.Values{encMessageKey: []string{b64EncShare}}
+		values := url.Values{EncMessageKey: []string{b64EncShare}}
 		req := httptest.NewRequest("POST", "/", strings.NewReader(values.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		w := httptest.NewRecorder()

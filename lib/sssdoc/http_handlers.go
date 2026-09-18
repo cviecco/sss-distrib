@@ -12,6 +12,10 @@ import (
 	"filippo.io/age"
 )
 
+const DocInfoPath = "sss-distrib/sss-doc"
+const KeyInfoPath = "sss-distrib/key-info"
+const ProcessSharePath = "sss-distrib/process-share"
+
 const jsonResponseContentType = "application/json; charset=utf-8"
 
 type SssShareStatus struct {
@@ -41,8 +45,8 @@ func (doc *SssProcessor) GetShareStatusHandler(w http.ResponseWriter, r *http.Re
 }
 
 type SssKexchangeKeys struct {
-	AgePubKeys  []string `json:"age_pub_keys"`
-	ReplayNonce string   `json:"replay_nonce"`
+	AgePubKeys        []string `json:"age_pub_keys"`
+	Base64ReplayNonce string   `json:"b64_replay_nonce"`
 }
 
 func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, r *http.Request) {
@@ -54,8 +58,8 @@ func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, 
 	b64replayNonce := base64.StdEncoding.EncodeToString(replayNonce)
 	pubAgeString := doc.agePQKey.Recipient().String()
 	payload, err := json.Marshal(SssKexchangeKeys{
-		AgePubKeys:  []string{pubAgeString},
-		ReplayNonce: b64replayNonce,
+		AgePubKeys:        []string{pubAgeString},
+		Base64ReplayNonce: b64replayNonce,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -69,10 +73,9 @@ func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, 
 }
 
 type DataMessage struct {
-	Epoch   int64  `json:"iat"` //To  prevent replay attacks outside the trust window
-	ReplayN string `json:"snonce"`
-	Target  string `json:"sub"`
-	Payload []byte `json:"payload"`
+	B64Nonce string `json:"b64nonce"` // replay attack prevention, as there is no common clock
+	Target   string `json:"sub"`
+	Payload  []byte `json:"payload"`
 }
 
 func NewAgeEncryptedMessage(payload []byte, publickey []byte, subject string, rpNonce string) ([]byte, error) {
@@ -81,10 +84,9 @@ func NewAgeEncryptedMessage(payload []byte, publickey []byte, subject string, rp
 
 func newAgeEncryptedMessageInternal(payload []byte, pubicKey []byte, subject string, rpNonce string, sentTime time.Time) ([]byte, error) {
 	Message := DataMessage{
-		Payload: payload,
-		Target:  subject,
-		Epoch:   sentTime.Unix(),
-		ReplayN: rpNonce,
+		Payload:  payload,
+		Target:   subject,
+		B64Nonce: rpNonce,
 	}
 	serializedMessage, err := json.Marshal(Message)
 	if err != nil {
@@ -99,10 +101,10 @@ func newAgeEncryptedMessageInternal(payload []byte, pubicKey []byte, subject str
 
 // Returns the payload
 func DecryptValidateAgeMessage(encryptedMessage []byte, privateKey []byte, subject string, rpchecker replayChecker) ([]byte, error) {
-	return decryptValidateAgeMessageInternal(encryptedMessage, privateKey, subject, rpchecker, time.Now())
+	return decryptValidateAgeMessageInternal(encryptedMessage, privateKey, subject, rpchecker)
 }
 
-func decryptValidateAgeMessageInternal(encryptedMessage []byte, privateKey []byte, subject string, rpchecker replayChecker, evalTime time.Time) ([]byte, error) {
+func decryptValidateAgeMessageInternal(encryptedMessage []byte, privateKey []byte, subject string, rpchecker replayChecker) ([]byte, error) {
 	idReader := bytes.NewReader(privateKey)
 	identity, err := age.ParseIdentities(idReader)
 	if err != nil {
@@ -126,7 +128,7 @@ func decryptValidateAgeMessageInternal(encryptedMessage []byte, privateKey []byt
 	if message.Target != subject {
 		return nil, fmt.Errorf("invalid target")
 	}
-	rawReplay, err := base64.StdEncoding.DecodeString(message.ReplayN)
+	rawReplay, err := base64.StdEncoding.DecodeString(message.B64Nonce)
 	if err != nil {
 		return nil, fmt.Errorf("invalid nonce encoding")
 	}
@@ -134,16 +136,6 @@ func decryptValidateAgeMessageInternal(encryptedMessage []byte, privateKey []byt
 	if !replayPass {
 		return nil, fmt.Errorf("unknown/bad replace nonce")
 	}
-	/*
-		currentEpoch := evalTime.Unix()
-		deltaEpoch := currentEpoch - message.Epoch
-		if deltaEpoch > 30 {
-			return nil, fmt.Errorf("Message too old")
-		}
-		if deltaEpoch < (-30) {
-			return nil, fmt.Errorf("Message too new")
-		}
-	*/
 	return message.Payload, nil
 }
 
@@ -177,7 +169,8 @@ func (doc *SssProcessor) ProcessEncryptedShareFromParams(params processEncrypedS
 	return nil, err
 }
 
-const encMessageKey = "b64encShare"
+// TODO, actually write a function that does the encoding for you and returns a request
+const EncMessageKey = "b64encShare"
 
 func (sp *SssProcessor) ParseEncryptedShareFromParams(w http.ResponseWriter, r *http.Request) (*processEncrypedShareParams, error) {
 	err := r.ParseForm()
@@ -185,9 +178,9 @@ func (sp *SssProcessor) ParseEncryptedShareFromParams(w http.ResponseWriter, r *
 		return nil, err
 	}
 	//fmt.Printf("parsing r==%+v", r)
-	b64EncShare := r.FormValue(encMessageKey)
+	b64EncShare := r.FormValue(EncMessageKey)
 	if b64EncShare == "" {
-		return nil, fmt.Errorf("Missing required value  '%s'", encMessageKey)
+		return nil, fmt.Errorf("Missing required value  '%s'", EncMessageKey)
 	}
 
 	var rvalue processEncrypedShareParams

@@ -140,7 +140,7 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 
 	plaintextSecrets := [][]byte{}
 	for i, identity := range identities {
-		ptShare, err := ageDecryptSingleShare(shareDoc.Shares[i], identity)
+		ptShare, err := AgeDecryptSingleShare(shareDoc.Shares[i], identity)
 		require.NoError(t, err)
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
