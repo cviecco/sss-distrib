@@ -116,7 +116,7 @@ func LoadAgeKeyWithPassPhrase(filePath string, passphrase string) (*ssdClient, e
 		return nil, err
 	}
 	sc.ptPrivateKey = outBuffer.Bytes()
-	sc.client = http.DefaultClient
+	sc.client = http.DefaultClient //TODO, we need our own with sensible timeouts
 	sc.keyType = sssdoc.KeyTypeAge
 	return &sc, nil
 }
@@ -193,16 +193,6 @@ func (sdc *ssdClient) PushShareToServer() error {
 	keyinfoRequest, err := http.NewRequest(http.MethodGet, keyinfoPath, nil)
 
 	keyInfoBody, err := sdc.GetSuccessFullBytesFromRequest(keyinfoRequest)
-	/*
-		keyInfoResponse, err := sdc.client.Do(keyinfoRequest)
-		if err != nil {
-			return err
-		}
-		if keyInfoResponse.StatusCode != http.StatusOK {
-			return fmt.Errorf("Invalid sttus code, got %d", keyInfoResponse.StatusCode)
-		}
-		keyInfoBody, err := io.ReadAll(keyInfoResponse.Body)
-	*/
 	if err != nil {
 		return err
 	}
@@ -236,8 +226,7 @@ shareDocLoop:
 		return fmt.Errorf("unable to decrypt any share with our private key, match not found")
 	}
 
-	fmt.Printf("llen =%d", len(plaintextShare))
-	//encMessage, err := sssdoc.NewAgeEncryptedMessage(plaintextShare,[]byte(keyInfo.AgePubKeys[0], "the Hostname", keyInfo.Base64ReplayNonce)
+	//fmt.Printf("llen =%d", len(plaintextShare))
 	encMsg, err := sssdoc.NewAgeEncryptedMessage(plaintextShare, []byte(keyInfo.AgePubKeys[0]), "hostname", keyInfo.Base64ReplayNonce)
 	if err != nil {
 		return err
@@ -260,5 +249,4 @@ shareDocLoop:
 	}
 	//TODO compare status?
 	return nil
-
 }

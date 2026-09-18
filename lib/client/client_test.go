@@ -1,6 +1,9 @@
 package client
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,4 +48,40 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 	pub2, err := sc2.GetPublicKey()
 	require.NoError(t, err)
 	require.Equal(t, pub1, pub2)
+}
+
+func TestGetSuccessfullBytesFromRequest(t *testing.T) {
+	// new client!
+
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			http.Error(w, "bad method", http.StatusBadRequest)
+			return
+		}
+		fmt.Fprintln(w, "Hello, client")
+	}))
+	defer ts.Close()
+
+	client := ssdClient{
+		BaseURL: ts.URL,
+		client:  ts.Client(),
+	}
+	req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+	require.NoError(t, err)
+	bodyBytes, err := client.GetSuccessFullBytesFromRequest(req)
+	require.NoError(t, err)
+	require.NotNil(t, bodyBytes)
+
+	//now a failed one, with a fail due to not being 200
+	badreq, err := http.NewRequest(http.MethodPatch, ts.URL, nil)
+	require.NoError(t, err)
+	_, err = client.GetSuccessFullBytesFromRequest(badreq)
+	require.Error(t, err)
+
+	// now a filed one witha. bad url
+	badreq2, err := http.NewRequest(http.MethodGet, "http:/example.com", nil)
+	require.NoError(t, err)
+	_, err = client.GetSuccessFullBytesFromRequest(badreq2)
+	require.Error(t, err)
+
 }
