@@ -12,9 +12,9 @@ import (
 	"filippo.io/age"
 )
 
-const DocInfoPath = "sss-distrib/sss-doc"
-const KeyInfoPath = "sss-distrib/key-info"
-const ProcessSharePath = "sss-distrib/process-share"
+const DocInfoPath = "/sss-distrib/sss-doc"
+const KeyInfoPath = "/sss-distrib/key-info"
+const ProcessSharePath = "/sss-distrib/process-share"
 
 const jsonResponseContentType = "application/json; charset=utf-8"
 
