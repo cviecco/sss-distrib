@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,9 +65,11 @@ func TestGetSuccessfullBytesFromRequest(t *testing.T) {
 	defer ts.Close()
 
 	client := ssdClient{
-		BaseURL: ts.URL,
-		client:  ts.Client(),
+		//BaseURL: ts.URL,
+		client: ts.Client(),
 	}
+	err := client.SetBaseURL(ts.URL)
+	require.NoError(t, err)
 	req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
 	require.NoError(t, err)
 	bodyBytes, err := client.GetSuccessFullBytesFromRequest(req)
@@ -134,11 +137,16 @@ func TestPushToServer(t *testing.T) {
 
 	ts := httptest.NewTLSServer(mux)
 	defer ts.Close()
+	parsedServerURL, err := url.Parse(ts.URL)
+	require.NoError(t, err)
+	processor.ProcesssingTarget = parsedServerURL.Hostname()
 
-	sc1.BaseURL = ts.URL
+	//sc1.BaseURL = ts.URL
+	err = sc1.SetBaseURL(ts.URL)
+	require.NoError(t, err)
 	sc1.client = ts.Client()
 
 	err = sc1.PushShareToServer()
-	require.Error(t, err) //This is busted, but fix needs changes in the server side
+	require.NoError(t, err) //This is busted, but fix needs changes in the server side
 
 }

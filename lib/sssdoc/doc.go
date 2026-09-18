@@ -40,9 +40,10 @@ type SssProcessor struct {
 	processedShare map[string][]byte
 	// TODO add data mutex
 
-	Doc        *ShareDoc
-	agePQKey   *age.HybridIdentity
-	rProtector *replayProtector
+	Doc               *ShareDoc
+	agePQKey          *age.HybridIdentity
+	rProtector        *replayProtector
+	ProcesssingTarget string
 
 	messageNonces [][]byte
 	nonceMutex    sync.Mutex

@@ -28,7 +28,7 @@ func mainx() {
 //   - encrypted key
 //   - key passphrase
 type ssdClient struct {
-	BaseURL      string
+	BaseURL      *url.URL
 	ptPrivateKey []byte //serialized key in plaintext
 
 	//passphrase   string
@@ -39,8 +39,12 @@ type ssdClient struct {
 
 // almost like: "age-keygen |age -p -a"
 func NewAgeKeyWithPassPhrase(outPath string, passphrase string, urlBase string) (*ssdClient, error) {
+	parsedURL, err := url.Parse(urlBase)
+	if err != nil {
+		return nil, err
+	}
 	sc := ssdClient{
-		BaseURL:  urlBase,
+		BaseURL:  parsedURL,
 		filePath: outPath,
 	}
 	agePQKey, err := age.GenerateHybridIdentity()
@@ -141,6 +145,15 @@ func ageDecrypt(in io.Reader, out io.Writer, identities ...age.Identity) error {
 	return nil
 }
 
+func (sdc *ssdClient) SetBaseURL(urlBase string) error {
+	parsedURL, err := url.Parse(urlBase)
+	if err != nil {
+		return err
+	}
+	sdc.BaseURL = parsedURL
+	return nil
+}
+
 func (sdc *ssdClient) GetPublicKey() ([]byte, error) {
 	pqident, err := age.ParseHybridIdentity(string(sdc.ptPrivateKey))
 	if err != nil {
@@ -174,8 +187,8 @@ func (sdc *ssdClient) PushShareToServer() error {
 	// compute encrypted share
 	// post encrypted share to servere
 
-	serverDocPath := sdc.BaseURL + "/" + sssdoc.DocInfoPath
-	docRequest, err := http.NewRequest(http.MethodGet, serverDocPath, nil)
+	serverDocURL := sdc.BaseURL.JoinPath(sssdoc.DocInfoPath)
+	docRequest, err := http.NewRequest(http.MethodGet, serverDocURL.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -191,8 +204,8 @@ func (sdc *ssdClient) PushShareToServer() error {
 	//fmt.Printf("shareDoc=%+v", shareDoc)
 
 	//now get the encryption data
-	keyinfoPath := sdc.BaseURL + "/" + sssdoc.KeyInfoPath
-	keyinfoRequest, err := http.NewRequest(http.MethodGet, keyinfoPath, nil)
+	keyinfoPath := sdc.BaseURL.JoinPath(sssdoc.KeyInfoPath)
+	keyinfoRequest, err := http.NewRequest(http.MethodGet, keyinfoPath.String(), nil)
 
 	keyInfoBody, err := sdc.GetSuccessFullBytesFromRequest(keyinfoRequest)
 	if err != nil {
@@ -233,7 +246,9 @@ shareDocLoop:
 	}
 
 	//fmt.Printf("llen =%d", len(plaintextShare))
-	encMsg, err := sssdoc.NewAgeEncryptedMessage(plaintextShare, []byte(keyInfo.AgePubKeys[0]), "hostname", keyInfo.Base64ReplayNonce)
+
+	// BUG: we need to pass the hostname here!
+	encMsg, err := sssdoc.NewAgeEncryptedMessage(plaintextShare, []byte(keyInfo.AgePubKeys[0]), sdc.BaseURL.Hostname(), keyInfo.Base64ReplayNonce)
 	if err != nil {
 		return err
 	}
@@ -241,8 +256,8 @@ shareDocLoop:
 	b64EncShare := base64.URLEncoding.EncodeToString(encMsg)
 	values := url.Values{sssdoc.EncMessageKey: []string{b64EncShare}}
 
-	postSharePath := sdc.BaseURL + "/" + sssdoc.ProcessSharePath
-	postEncShareReq, err := http.NewRequest(http.MethodPost, postSharePath, strings.NewReader(values.Encode()))
+	postSharePath := sdc.BaseURL.JoinPath(sssdoc.ProcessSharePath)
+	postEncShareReq, err := http.NewRequest(http.MethodPost, postSharePath.String(), strings.NewReader(values.Encode()))
 	postEncShareReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	sharePostBytes, err := sdc.GetSuccessFullBytesFromRequest(postEncShareReq)

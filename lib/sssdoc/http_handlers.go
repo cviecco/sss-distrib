@@ -164,9 +164,19 @@ func (doc *SssProcessor) ProcessEncryptedShareFromParams(params processEncrypedS
 		return nil, fmt.Errorf("unable to readdecrypted bytes  %w", err)
 	}
 	// Here we check for replay + id
-
 	_, err = doc.ProcessShare(plaintextShare)
 	return nil, err
+}
+
+func (doc *SssProcessor) ProcessEncrypedShareMessageFromParams(params processEncrypedShareParams) (usererr error, internalerr error) {
+	plaintextShare, err := DecryptValidateAgeMessage(params.EncrypedShare, []byte(doc.agePQKey.String()), doc.ProcesssingTarget, doc.rProtector)
+	if err != nil {
+		fmt.Printf("error decrypting message=%s", err)
+		return err, nil
+	}
+	_, err = doc.ProcessShare(plaintextShare)
+	return nil, err
+
 }
 
 // TODO, actually write a function that does the encoding for you and returns a request
@@ -199,7 +209,8 @@ func (sp *SssProcessor) ProcessKeyShareHandler(w http.ResponseWriter, r *http.Re
 		http.Error(w, fmt.Sprintf("Bad/Invalid params: %s ", err), http.StatusBadRequest)
 		return
 	}
-	userErr, err := sp.ProcessEncryptedShareFromParams(*params)
+	//userErr, err := sp.ProcessEncryptedShareFromParams(*params)
+	userErr, err := sp.ProcessEncrypedShareMessageFromParams(*params)
 	if userErr != nil {
 		http.Error(w, fmt.Sprintf("Bad/Invalid params: %s ", err), http.StatusBadRequest)
 		return
