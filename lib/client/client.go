@@ -69,6 +69,7 @@ func NewAgeKeyWithPassPhrase(outPath string, passphrase string, urlBase string) 
 	if err != nil {
 		return nil, err
 	}
+	sc.keyType = sssdoc.KeyTypeAge
 	return &sc, nil
 }
 
@@ -160,7 +161,7 @@ func (sdc *ssdClient) GetSuccessFullBytesFromRequest(r *http.Request) ([]byte, e
 		return nil, fmt.Errorf("unable to read request body, resp code=%d err=%s", resp.StatusCode, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return respBytes, fmt.Errorf("inbalid status got %d", resp.StatusCode)
+		return respBytes, fmt.Errorf("invalid status got %d", resp.StatusCode)
 	}
 	return respBytes, nil
 }
@@ -173,31 +174,32 @@ func (sdc *ssdClient) PushShareToServer() error {
 	// compute encrypted share
 	// post encrypted share to servere
 
-	serverDocPath := sdc.BaseURL + sssdoc.DocInfoPath
+	serverDocPath := sdc.BaseURL + "/" + sssdoc.DocInfoPath
 	docRequest, err := http.NewRequest(http.MethodGet, serverDocPath, nil)
 	if err != nil {
 		return err
 	}
 	serializedDoc, err := sdc.GetSuccessFullBytesFromRequest(docRequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting share doc: %w", err)
 	}
 	var shareDoc sssdoc.ShareDoc
 	err = json.Unmarshal(serializedDoc, &shareDoc)
 	if err != nil {
 		return err
 	}
+	//fmt.Printf("shareDoc=%+v", shareDoc)
 
 	//now get the encryption data
-	keyinfoPath := sdc.BaseURL + sssdoc.KeyInfoPath
+	keyinfoPath := sdc.BaseURL + "/" + sssdoc.KeyInfoPath
 	keyinfoRequest, err := http.NewRequest(http.MethodGet, keyinfoPath, nil)
 
 	keyInfoBody, err := sdc.GetSuccessFullBytesFromRequest(keyinfoRequest)
 	if err != nil {
-		return err
+		return fmt.Errorf("errot getting keyinfodoc %w", err)
 	}
 	var keyInfo sssdoc.SssKexchangeKeys
-	err = json.Unmarshal(keyInfoBody, keyInfo)
+	err = json.Unmarshal(keyInfoBody, &keyInfo)
 	if err != nil {
 		return err
 	}
@@ -216,10 +218,14 @@ shareDocLoop:
 		case sssdoc.KeyTypeAge:
 			plaintextShare, err = sssdoc.AgeDecryptSingleShare(share, identity)
 			if err != nil {
+				fmt.Printf("failed share, share=%+v", share)
 				continue
 			}
+			fmt.Printf("share found")
 			shareFound = true
 			break shareDocLoop
+		default:
+			fmt.Printf("unknown key type type=%d", sdc.keyType)
 		}
 	}
 	if !shareFound {
@@ -234,16 +240,17 @@ shareDocLoop:
 	// Now we prepare the message to be posted
 	b64EncShare := base64.URLEncoding.EncodeToString(encMsg)
 	values := url.Values{sssdoc.EncMessageKey: []string{b64EncShare}}
-	postSharePath := sdc.BaseURL + sssdoc.ProcessSharePath
+
+	postSharePath := sdc.BaseURL + "/" + sssdoc.ProcessSharePath
 	postEncShareReq, err := http.NewRequest(http.MethodPost, postSharePath, strings.NewReader(values.Encode()))
 	postEncShareReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	sharePostBytes, err := sdc.GetSuccessFullBytesFromRequest(postEncShareReq)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to post share for processing %w", err)
 	}
 	var sssStatus sssdoc.SssShareStatus
-	err = json.Unmarshal(sharePostBytes, sssStatus)
+	err = json.Unmarshal(sharePostBytes, &sssStatus)
 	if err != nil {
 		return err
 	}
