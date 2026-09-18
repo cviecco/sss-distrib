@@ -105,20 +105,10 @@ func (r *RmCmd) Run(ctx *Context) error {
 	return nil
 }
 
-type LsCmd struct {
-	Paths []string `arg:"" optional:"" name:"path" help:"Paths to list." type:"path"`
-}
-
-func (l *LsCmd) Run(ctx *Context) error {
-	fmt.Println("ls", l.Paths)
-	return nil
-}
-
 var cli struct {
 	Debug bool `help:"Enable debug mode."`
 
 	Rm     RmCmd           `cmd:"" help:"Remove files."`
-	Ls     LsCmd           `cmd:"" help:"List paths."`
 	GenDoc GenDocCmd       `cmd:"" help:"Generate SSS document."`
 	GenAge GenNewEncAgeKey `cmd:"" help:"Generate New Encypte Age key and public key files."`
 }

@@ -9,6 +9,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
+	"time"
 
 	"filippo.io/age"
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
@@ -36,8 +38,15 @@ type ShareDoc struct {
 type SssProcessor struct {
 	sharedSecret   []byte
 	processedShare map[string][]byte
-	Doc            *ShareDoc
-	agePQKey       *age.HybridIdentity
+	// TODO add data mutex
+
+	Doc               *ShareDoc
+	agePQKey          *age.HybridIdentity
+	rProtector        *replayProtector
+	ProcesssingTarget string
+
+	messageNonces [][]byte
+	nonceMutex    sync.Mutex
 }
 
 func NewSSSDoc() (*SssProcessor, error) {
@@ -101,7 +110,28 @@ func NewProcessorFromShareDoc(sd *ShareDoc) (*SssProcessor, error) {
 	if err != nil {
 		return nil, err
 	}
+	rvalue.rProtector, err = NewReplayProtector()
+	if err != nil {
+		return nil, err
+	}
 	return &rvalue, nil
+}
+
+const maxNonceQueueSize = 10
+const nonceRefreshRate = 5 * time.Second
+
+func (sp *SssProcessor) StartNonceRotation() error {
+	for true {
+		newNonce := []byte("xxx")
+		sp.nonceMutex.Lock()
+		sp.messageNonces = append(sp.messageNonces, newNonce)
+		if len(sp.messageNonces) > maxNonceQueueSize {
+			sp.messageNonces = sp.messageNonces[1:] // drop 0th element
+		}
+		sp.nonceMutex.Unlock()
+		time.Sleep(nonceRefreshRate)
+	}
+	return nil
 }
 
 const randomStringEntropyBytes = 32
@@ -171,7 +201,7 @@ func generateDocWithSecret(secret []byte, recipients [][]byte, identifiers []str
 	return &outDoc, nil
 }
 
-func ageDecryptSingleShare(share EncrypedShare, identities []age.Identity) ([]byte, error) {
+func AgeDecryptSingleShare(share EncrypedShare, identities []age.Identity) ([]byte, error) {
 	encReader := bytes.NewReader(share.EncryptedBlob)
 	plaintextReader, err := age.Decrypt(encReader, identities...)
 	if err != nil {

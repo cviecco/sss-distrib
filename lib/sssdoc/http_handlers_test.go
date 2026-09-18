@@ -104,14 +104,20 @@ func TestProcessEncryptedShareFromParamsSuccess(t *testing.T) {
 	for i, x25519ident := range x25519identities {
 		idReader := bytes.NewReader([]byte(x25519ident.String()))
 		identity, err := age.ParseIdentities(idReader)
-		ptShare, err := ageDecryptSingleShare(sd.Doc.Shares[i], identity)
+		ptShare, err := AgeDecryptSingleShare(sd.Doc.Shares[i], identity)
 		require.NoError(t, err)
 
 		//With the now we encrypt the plaintextshare with the sd key
-		encShare, _, err := encryptDataWithPublic(ptShare, []byte(sd.agePQKey.Recipient().String()))
+		//encShare, _, err := encryptDataWithPublic(ptShare, []byte(sd.agePQKey.Recipient().String()))
+		//require.NoError(t, err)
+		//encMsg, err := NewAgeEncryptedMessage(ptShare, []byte(keyInfo.AgePubKeys[0]), "hostname", keyInfo.Base64ReplayNonce)
+		nonce, err := sd.rProtector.GetProtectorBytes()
 		require.NoError(t, err)
-		b64EncShare := base64.URLEncoding.EncodeToString(encShare)
-		values := url.Values{"b64encShare": []string{b64EncShare}}
+		b64nonce := base64.StdEncoding.EncodeToString(nonce)
+		encMsg, err := NewAgeEncryptedMessage(ptShare, []byte(sd.agePQKey.Recipient().String()), sd.ProcesssingTarget, b64nonce)
+		require.NoError(t, err)
+		b64EncShare := base64.URLEncoding.EncodeToString(encMsg)
+		values := url.Values{EncMessageKey: []string{b64EncShare}}
 		req := httptest.NewRequest("POST", "/", strings.NewReader(values.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		w := httptest.NewRecorder()
@@ -127,5 +133,43 @@ func TestProcessEncryptedShareFromParamsSuccess(t *testing.T) {
 
 		require.Equal(t, len(sd.processedShare), i+1)
 	}
+
+}
+
+func TestEncryptDecryptMessage(t *testing.T) {
+	//hybridKey, err := age.New
+
+	// First valid round trip
+	agePQKey, err := age.GenerateHybridIdentity()
+	require.NoError(t, err)
+
+	rprotector, err := NewReplayProtector()
+	require.NoError(t, err)
+
+	payloadText := "hello"
+	messageSubject := "target1"
+	nonce, err := rprotector.GetProtectorBytes()
+	require.NoError(t, err)
+	b64nonce := base64.StdEncoding.EncodeToString(nonce)
+
+	encMessage, err := NewAgeEncryptedMessage([]byte(payloadText),
+		[]byte(agePQKey.Recipient().String()), messageSubject, b64nonce)
+	require.NoError(t, err)
+	//now the return
+	payload, err := DecryptValidateAgeMessage(encMessage, []byte(agePQKey.String()), messageSubject, rprotector)
+	require.NoError(t, err)
+	require.Equal(t, payloadText, string(payload))
+
+	// now with busted subject
+	_, err = DecryptValidateAgeMessage(encMessage, []byte(agePQKey.Recipient().String()), "randomSubject", rprotector)
+	require.Error(t, err)
+
+	// Now with invalid nonce
+	invalidNonceencMessage, err := NewAgeEncryptedMessage([]byte(payloadText),
+		[]byte(agePQKey.Recipient().String()), messageSubject,
+		base64.StdEncoding.EncodeToString([]byte("1234")))
+	_, err = DecryptValidateAgeMessage(invalidNonceencMessage,
+		[]byte(agePQKey.String()), messageSubject, rprotector)
+	require.Error(t, err)
 
 }
