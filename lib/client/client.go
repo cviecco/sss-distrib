@@ -19,10 +19,6 @@ import (
 	"github.com/cviecco/sss-distrib/lib/sssdoc"
 )
 
-func mainx() {
-	fmt.Println("vim-go")
-}
-
 // We need 3 things:
 //   - url
 //   - encrypted key
@@ -33,13 +29,14 @@ type ssdClient struct {
 	gpgPrivateKey *gpgcrypto.Key
 
 	filePath string
-	keyType  int // should be an enum
+	keyType  int // This reuses the doc key types
 	client   *http.Client
 
 	logger *slog.Logger
 }
 
-// almost like: "age-keygen |age -p -a"
+// This fuct
+// like: "age-keygen | grep SECRET |age -p -a"
 func NewGenerateAgeKeyWithPassPhrase(outPath string, passphrase string, urlBase string, logger *slog.Logger) (*ssdClient, error) {
 	parsedURL, err := url.Parse(urlBase)
 	if err != nil {
@@ -118,14 +115,15 @@ func LoadArmoredKeyWithPassPhrase(filepath string, passphrase string, logger *sl
 	if err != nil {
 		return nil, err
 	}
+	defer fin.Close()
+	return LoadArmoredKeyWithReaderAndPassPhrase(fin, passphrase, logger)
+}
+func LoadArmoredKeyWithReaderAndPassPhrase(fin io.Reader, passphrase string, logger *slog.Logger) (*ssdClient, error) {
 	lr := io.LimitedReader{
 		R: fin,
 		N: maxKeySize,
 	}
-	return LoadArmoredKeyWithReaderAndPassPhrase(&lr, passphrase, logger)
-}
-func LoadArmoredKeyWithReaderAndPassPhrase(lr io.Reader, passphrase string, logger *slog.Logger) (*ssdClient, error) {
-	armoredBytes, err := io.ReadAll(lr)
+	armoredBytes, err := io.ReadAll(&lr)
 	if err != nil {
 		return nil, err
 	}
@@ -140,16 +138,6 @@ func LoadArmoredKeyWithReaderAndPassPhrase(lr io.Reader, passphrase string, logg
 	default:
 		return nil, fmt.Errorf("unable to guess file type")
 	}
-}
-
-// The file is assumed to be an armored key file
-func LoadAgeKeyWithPassPhrase(filePath string, passphrase string, logger *slog.Logger) (*ssdClient, error) {
-
-	fin, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	return loadAgeKeyWithReaderAndPassPhrase(fin, passphrase, logger)
 }
 
 func loadAgeKeyWithReaderAndPassPhrase(armoredReader io.Reader, passphrase string, logger *slog.Logger) (*ssdClient, error) {
