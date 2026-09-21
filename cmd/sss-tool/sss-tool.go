@@ -46,7 +46,7 @@ func (gd *GenDocCmd) Run(ctx *Context) error {
 	outWriter = os.Stdout
 	// TODO: create output filepath if needed (io.OpenFile
 	if gd.OutputPath != "" {
-		outFile, err := os.OpenFile(gd.OutputPath, os.O_CREATE|os.O_RDWR, 0644)
+		outFile, err := os.OpenFile(gd.OutputPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 		if err != nil {
 			return err
 		}
@@ -94,7 +94,7 @@ func (gnak *GenNewEncAgeKey) Run(ctx *Context) error {
 		return err
 	}
 	pubkeyPath := gnak.OutputPath + ".pub"
-	pubFile, err := os.OpenFile(pubkeyPath, os.O_RDWR|os.O_CREATE, 0644)
+	pubFile, err := os.OpenFile(pubkeyPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func (cl *ClientCmd) Run(ctx *Context) error {
 	}
 	// TODO, we should to some peeking to ensure we got the right type of
 	// key, for now we assume age encrypted key
-	sdclient, err := client.LoadAgeKeyWithPassPhraseAndReader(f, string(pass), logger)
+	sdclient, err := client.LoadArmoredKeyWithReaderAndPassPhrase(f, string(pass), logger)
 	if err != nil {
 		fmt.Printf("cannot load key, bad passphrase?\n")
 		return nil

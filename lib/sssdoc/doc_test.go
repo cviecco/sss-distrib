@@ -180,6 +180,7 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 		armoredPub, err := publicKey.GetArmoredPublicKey()
 		require.NoError(t, err)
 		recipients = append(recipients, []byte(armoredPub))
+		t.Logf("public=%s", armoredPub)
 
 	}
 
@@ -188,7 +189,7 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 
 	plaintextSecrets := [][]byte{}
 	for i, armored := range armoredPrivate {
-		ptShare, err := gpgDecryptSingleShare(shareDoc.Shares[i], []byte(armored), []byte(testPassphrase))
+		ptShare, err := gpgDecryptSingleShareWithPassPhrase(shareDoc.Shares[i], []byte(armored), []byte(testPassphrase))
 		require.NoError(t, err)
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
