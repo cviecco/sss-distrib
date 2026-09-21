@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"net/url"
 	"os"
+	"time"
 
 	"golang.org/x/term"
 
@@ -27,7 +31,7 @@ type Context struct {
 
 type GenDocCmd struct {
 	NumReqiredKeys int      `arg:"" name:"requirekeycount" help:"Number of shares needed for recombining." type:"int"`
-	OutputPath     string   `arg:"" name:"output" help:"FileOutputPath." type:"path"`
+	OutputPath     string   `name:"output" help:"FileOutputPath." type:"path"`
 	PublicKeyPaths []string `arg:"" name:"path" help:"Files with public keys (one per file)." type:"path"`
 }
 
@@ -40,6 +44,14 @@ func (gd *GenDocCmd) Run(ctx *Context) error {
 	var outWriter io.Writer
 	outWriter = os.Stdout
 	// TODO: create output filepath if needed (io.OpenFile
+	if gd.OutputPath != "" {
+		outFile, err := os.OpenFile(gd.OutputPath, os.O_CREATE|os.O_RDWR, 0644)
+		if err != nil {
+			return err
+		}
+		defer outFile.Close()
+		outWriter = outFile
+	}
 
 	sd, err := sssdoc.GenerateNewDocFromKeys(recipients, gd.NumReqiredKeys)
 	if err != nil {
@@ -50,8 +62,8 @@ func (gd *GenDocCmd) Run(ctx *Context) error {
 		return fmt.Errorf("error serializing share doc: %w", err)
 	}
 
-	io.WriteString(outWriter, string(serialized))
-	return nil
+	_, err = io.WriteString(outWriter, string(serialized))
+	return err
 }
 
 type GenNewEncAgeKey struct {
@@ -93,24 +105,102 @@ func (gnak *GenNewEncAgeKey) Run(ctx *Context) error {
 	//return fmt.Errorf("not implemented")
 }
 
-type RmCmd struct {
-	Force     bool `help:"Force removal."`
-	Recursive bool `help:"Recursively remove files."`
-
-	Paths []string `arg:"" name:"path" help:"Paths to remove." type:"path"`
+type ServerDemoCmd struct {
+	ListenPort int    `name:"port" default:"8080" help:"port to attach to (localhost)" `
+	DocPath    string `name:"docpath" type:"path"`
 }
 
-func (r *RmCmd) Run(ctx *Context) error {
-	fmt.Println("rm", r.Paths)
+func (scommand *ServerDemoCmd) Run(ctx *Context) error {
+	//load processor from path
+	f, err := os.Open(scommand.DocPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	serializedDoc, err := io.ReadAll(f)
+	if err != nil {
+		return err
+	}
+	processor, err := sssdoc.NewProcessorFromShareDocJSON(serializedDoc)
+	if err != nil {
+		return err
+	}
+	// This is the second time we have written this.. maybe time to unify?
+	mux := http.NewServeMux()
+	mux.HandleFunc(sssdoc.DocInfoPath, processor.ServeShareDocHandler)
+	mux.HandleFunc(sssdoc.KeyInfoPath, processor.GetKeyExchangePublicKeysHandler)
+	mux.HandleFunc(sssdoc.ProcessSharePath, processor.ProcessKeyShareHandler)
+
+	addr := fmt.Sprintf("127.0.0.1:%d", scommand.ListenPort)
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+	processor.ProcesssingTarget = host
+
+	server := &http.Server{
+		Addr:           addr,
+		Handler:        mux,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	fmt.Printf("starting server at %s\n", addr)
+	err = server.ListenAndServe()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ClientCmd struct {
+	ServerURL string `name:"server" default:"http://127.0.0.1:8080" help:"url to connect to" `
+	KeyPath   string `name:"keypath" help:"path to the encypted private key" type:"path"`
+}
+
+func (cl *ClientCmd) Run(ctx *Context) error {
+	f, err := os.Open(cl.KeyPath)
+	if err != nil {
+		return err
+	}
+	// TODO: do some initial checks if the url is valid before
+	// asking for interactive stuff.
+	_, err = url.Parse(cl.ServerURL)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("please enter your passphrase:")
+	pass, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return err
+	}
+	// TODO, we should to some peeking to ensure we got the right type of
+	// key, for now we assume age encrypted key
+	sdclient, err := client.LoadAgeKeyWithPassPhraseAndReader(f, string(pass))
+	if err != nil {
+		fmt.Printf("cannot load key, bad passphrase?\n")
+		return nil
+	}
+	fmt.Printf("key loaded\n")
+	err = sdclient.SetBaseURL(cl.ServerURL)
+	if err != nil {
+		return err
+	}
+	err = sdclient.PushShareToServer()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 var cli struct {
 	Debug bool `help:"Enable debug mode."`
 
-	Rm     RmCmd           `cmd:"" help:"Remove files."`
 	GenDoc GenDocCmd       `cmd:"" help:"Generate SSS document."`
 	GenAge GenNewEncAgeKey `cmd:"" help:"Generate New Encypte Age key and public key files."`
+	Server ServerDemoCmd   `cmd:"" help:"Sart new Demo server."`
+	Client ClientCmd       `cmd:"" help:"Sart new client"`
 }
 
 func main() {

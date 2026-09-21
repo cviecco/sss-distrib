@@ -12,8 +12,6 @@ import (
 	"os"
 	"strings"
 
-	//"path"
-
 	"filippo.io/age"
 	agearmor "filippo.io/age/armor"
 	"github.com/cviecco/sss-distrib/lib/sssdoc"
@@ -100,9 +98,18 @@ func ageEncrypt(recipients []age.Recipient, in io.Reader, out io.Writer, withArm
 }
 
 // The file is assumed to be an armored key file
-func LoadAgeKeyWithPassPhrase(filePath string, passphrase string) (*ssdClient, error) {
+func LoadAgeKeyWithPassPhrase(filepath string, passphrase string) (*ssdClient, error) {
+	fin, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer fin.Close()
+	return LoadAgeKeyWithPassPhraseAndReader(fin, passphrase)
+}
+
+func LoadAgeKeyWithPassPhraseAndReader(keyReader io.ReadCloser, passphrase string) (*ssdClient, error) {
 	sc := ssdClient{
-		filePath: filePath,
+		//filePath: filePath,
 	}
 	//identities := []age.Identity{} //Need to fix this one
 
@@ -110,13 +117,14 @@ func LoadAgeKeyWithPassPhrase(filePath string, passphrase string) (*ssdClient, e
 	if err != nil {
 		return nil, err
 	}
-
-	fin, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
+	/*
+		fin, err := os.Open(filePath)
+		if err != nil {
+			return nil, err
+		}
+	*/
 	var outBuffer bytes.Buffer
-	err = ageDecrypt(fin, &outBuffer, identities)
+	err = ageDecrypt(keyReader, &outBuffer, identities)
 	if err != nil {
 		return nil, err
 	}
@@ -231,14 +239,13 @@ shareDocLoop:
 		case sssdoc.KeyTypeAge:
 			plaintextShare, err = sssdoc.AgeDecryptSingleShare(share, identity)
 			if err != nil {
-				fmt.Printf("failed share, share=%+v", share)
+				fmt.Printf("failed share, share=%+v\n", share)
 				continue
 			}
-			fmt.Printf("share found")
 			shareFound = true
 			break shareDocLoop
 		default:
-			fmt.Printf("unknown key type type=%d", sdc.keyType)
+			return fmt.Errorf("unknown key type %d", sdc.keyType)
 		}
 	}
 	if !shareFound {
