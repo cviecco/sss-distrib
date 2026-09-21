@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -76,13 +77,15 @@ func (gnak *GenNewEncAgeKey) Run(ctx *Context) error {
 	// 3. getpublic from key
 	// 4. writepublic to file
 
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
 	// TODO generate passphrase on empty
 	fmt.Println("please enter your passphrase:")
 	pass, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return err
 	}
-	sdclient, err := client.NewAgeKeyWithPassPhrase(gnak.OutputPath, string(pass), "someurl")
+	sdclient, err := client.NewGenerateAgeKeyWithPassPhrase(gnak.OutputPath, string(pass), "someurl", logger)
 	if err != nil {
 		return err
 	}
@@ -159,6 +162,14 @@ type ClientCmd struct {
 }
 
 func (cl *ClientCmd) Run(ctx *Context) error {
+
+	var programLevel = new(slog.LevelVar) // Info by default
+	if ctx.Debug {
+		programLevel.Set(slog.LevelDebug)
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: programLevel}))
+
 	f, err := os.Open(cl.KeyPath)
 	if err != nil {
 		return err
@@ -177,12 +188,12 @@ func (cl *ClientCmd) Run(ctx *Context) error {
 	}
 	// TODO, we should to some peeking to ensure we got the right type of
 	// key, for now we assume age encrypted key
-	sdclient, err := client.LoadAgeKeyWithPassPhraseAndReader(f, string(pass))
+	sdclient, err := client.LoadAgeKeyWithPassPhraseAndReader(f, string(pass), logger)
 	if err != nil {
 		fmt.Printf("cannot load key, bad passphrase?\n")
 		return nil
 	}
-	fmt.Printf("key loaded\n")
+	logger.Info("key loaded")
 	err = sdclient.SetBaseURL(cl.ServerURL)
 	if err != nil {
 		return err
@@ -191,6 +202,7 @@ func (cl *ClientCmd) Run(ctx *Context) error {
 	if err != nil {
 		return err
 	}
+	logger.Info("share pushed successfully")
 	return nil
 }
 
