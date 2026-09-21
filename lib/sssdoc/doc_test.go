@@ -180,6 +180,7 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 		armoredPub, err := publicKey.GetArmoredPublicKey()
 		require.NoError(t, err)
 		recipients = append(recipients, []byte(armoredPub))
+		t.Logf("public=%s", armoredPub)
 
 	}
 

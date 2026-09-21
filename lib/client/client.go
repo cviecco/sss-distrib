@@ -55,7 +55,7 @@ func NewGenerateAgeKeyWithPassPhrase(outPath string, passphrase string, urlBase 
 		return nil, err
 	}
 
-	out, err := os.OpenFile(outPath, os.O_RDWR|os.O_CREATE, 0644)
+	out, err := os.OpenFile(outPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -297,18 +297,29 @@ func (sdc *ssdClient) PushShareToServer() error {
 	sdc.logger.Debug("Fetched and Parsed keyinfo document")
 
 	shareFound := false
-	idReader := bytes.NewReader([]byte(sdc.ptPrivateKey))
-	identity, err := age.ParseIdentities(idReader)
-	if err != nil {
-		return err
-	}
+
 	var plaintextShare []byte
 shareDocLoop:
 	for i, share := range shareDoc.Shares {
 		// TODO, check with identifier, since we have NOT implemented this we need to try to decrypt with our key
 		switch sdc.keyType {
 		case sssdoc.KeyTypeAge:
+			// TODO we should actually move the switch outside the loop
+			idReader := bytes.NewReader([]byte(sdc.ptPrivateKey))
+			identity, err := age.ParseIdentities(idReader)
+			if err != nil {
+				return err
+			}
+
 			plaintextShare, err = sssdoc.AgeDecryptSingleShare(share, identity)
+			if err != nil {
+				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
+				continue
+			}
+			shareFound = true
+			break shareDocLoop
+		case sssdoc.KeyTypePGP:
+			plaintextShare, err = sssdoc.GpgDecryptSingleShare(share, sdc.gpgPrivateKey)
 			if err != nil {
 				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
 				continue
