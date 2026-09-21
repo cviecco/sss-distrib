@@ -135,6 +135,7 @@ func LoadAgeKeyWithPassPhraseAndReader(keyReader io.ReadCloser, passphrase strin
 	sc.ptPrivateKey = outBuffer.Bytes()
 	sc.client = http.DefaultClient //TODO, we need our own with sensible timeouts
 	sc.keyType = sssdoc.KeyTypeAge
+	sc.logger = logger
 	return &sc, nil
 }
 
@@ -213,7 +214,7 @@ func (sdc *ssdClient) PushShareToServer() error {
 	if err != nil {
 		return err
 	}
-	//fmt.Printf("shareDoc=%+v", shareDoc)
+	sdc.logger.Debug("Fetched and parsed share document")
 
 	//now get the encryption data
 	keyinfoPath := sdc.baseURL.JoinPath(sssdoc.KeyInfoPath)
@@ -228,6 +229,7 @@ func (sdc *ssdClient) PushShareToServer() error {
 	if err != nil {
 		return err
 	}
+	sdc.logger.Debug("Fetched and Parsed keyinfo document")
 
 	shareFound := false
 	idReader := bytes.NewReader([]byte(sdc.ptPrivateKey))
@@ -237,13 +239,13 @@ func (sdc *ssdClient) PushShareToServer() error {
 	}
 	var plaintextShare []byte
 shareDocLoop:
-	for _, share := range shareDoc.Shares {
+	for i, share := range shareDoc.Shares {
 		// TODO, check with identifier, since we have NOT implemented this we need to try to decrypt with our key
 		switch sdc.keyType {
 		case sssdoc.KeyTypeAge:
 			plaintextShare, err = sssdoc.AgeDecryptSingleShare(share, identity)
 			if err != nil {
-				fmt.Printf("failed share, share=%+v\n", share)
+				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
 				continue
 			}
 			shareFound = true
@@ -253,8 +255,10 @@ shareDocLoop:
 		}
 	}
 	if !shareFound {
+		sdc.logger.Debug("share not found", slog.String("shareDoc", string(serializedDoc)))
 		return fmt.Errorf("unable to decrypt any share with our private key, match not found")
 	}
+	sdc.logger.Debug("Successfully Decrypted share from encryped doc")
 
 	//fmt.Printf("llen =%d", len(plaintextShare))
 

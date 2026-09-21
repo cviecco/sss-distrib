@@ -163,7 +163,12 @@ type ClientCmd struct {
 
 func (cl *ClientCmd) Run(ctx *Context) error {
 
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	var programLevel = new(slog.LevelVar) // Info by default
+	if ctx.Debug {
+		programLevel.Set(slog.LevelDebug)
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: programLevel}))
 
 	f, err := os.Open(cl.KeyPath)
 	if err != nil {
@@ -188,7 +193,7 @@ func (cl *ClientCmd) Run(ctx *Context) error {
 		fmt.Printf("cannot load key, bad passphrase?\n")
 		return nil
 	}
-	fmt.Printf("key loaded\n")
+	logger.Info("key loaded")
 	err = sdclient.SetBaseURL(cl.ServerURL)
 	if err != nil {
 		return err
@@ -197,7 +202,7 @@ func (cl *ClientCmd) Run(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("share pushed successfully")
+	logger.Info("share pushed successfully")
 	return nil
 }
 
