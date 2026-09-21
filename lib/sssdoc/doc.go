@@ -211,11 +211,15 @@ func AgeDecryptSingleShare(share EncrypedShare, identities []age.Identity) ([]by
 	return io.ReadAll(plaintextReader)
 }
 
-func gpgDecryptSingleShare(share EncrypedShare, armoredPrivate []byte, passphrase []byte) ([]byte, error) {
+func gpgDecryptSingleShareWithPassPhrase(share EncrypedShare, armoredPrivate []byte, passphrase []byte) ([]byte, error) {
 	privateKey, err := crypto.NewPrivateKeyFromArmored(string(armoredPrivate), passphrase)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse armored gpg private key: %w", err)
 	}
+	return GpgDecryptSingleShare(share, privateKey)
+}
+
+func GpgDecryptSingleShare(share EncrypedShare, privateKey *crypto.Key) ([]byte, error) {
 	pgp := crypto.PGP()
 	decHandle, err := pgp.Decryption().DecryptionKey(privateKey).New()
 	if err != nil {
