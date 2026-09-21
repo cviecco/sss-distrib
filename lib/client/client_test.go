@@ -205,5 +205,13 @@ func TestLoadPGPGArmoredKey(t *testing.T) {
 	require.NoError(t, err)
 	pub2, err := sdc2.GetPublicKey()
 	require.Equal(t, pub1, pub2)
+}
+
+func TestFindAndDecryptShare(t *testing.T) {
+	logger := slogt.New(t)
+	var outBuffer bytes.Buffer
+	sdc, err := newArmoredAgeKeyWithReaderAndPassphrase(&outBuffer, testPassphrase, "http://example.com", logger)
+	require.NoError(t, err)
+	require.NotNil(t, sdc)
 
 }

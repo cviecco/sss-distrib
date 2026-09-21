@@ -38,25 +38,28 @@ type ssdClient struct {
 // This fuct
 // like: "age-keygen | grep SECRET |age -p -a"
 func NewGenerateAgeKeyWithPassPhrase(outPath string, passphrase string, urlBase string, logger *slog.Logger) (*ssdClient, error) {
-	parsedURL, err := url.Parse(urlBase)
-	if err != nil {
-		return nil, err
-	}
-	sc := ssdClient{
-		baseURL:  parsedURL,
-		filePath: outPath,
-		logger:   logger,
-	}
-	agePQKey, err := age.GenerateHybridIdentity()
-	if err != nil {
-		return nil, err
-	}
-
 	out, err := os.OpenFile(outPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}
 	defer out.Close()
+	return newArmoredAgeKeyWithReaderAndPassphrase(out, passphrase, urlBase, logger)
+}
+
+func newArmoredAgeKeyWithReaderAndPassphrase(out io.Writer, passphrase string, urlBase string, logger *slog.Logger) (*ssdClient, error) {
+	parsedURL, err := url.Parse(urlBase)
+	if err != nil {
+		return nil, err
+	}
+	sc := ssdClient{
+		baseURL: parsedURL,
+		//filePath: outPath,
+		logger: logger,
+	}
+	agePQKey, err := age.GenerateHybridIdentity()
+	if err != nil {
+		return nil, err
+	}
 
 	sc.ptPrivateKey = []byte(agePQKey.String())
 
@@ -245,6 +248,42 @@ func (sdc *ssdClient) GetSuccessFullBytesFromRequest(r *http.Request) ([]byte, e
 	return respBytes, nil
 }
 
+func (sdc *ssdClient) findAndDecryptShare(shares []sssdoc.EncrypedShare) ([]byte, error) {
+	var identity []age.Identity
+	var err error
+	if sdc.keyType == sssdoc.KeyTypeAge {
+		idReader := bytes.NewReader([]byte(sdc.ptPrivateKey))
+		identity, err = age.ParseIdentities(idReader)
+		if err != nil {
+			return nil, err
+		}
+	}
+	//var plaintextShare []byte
+	for i, share := range shares {
+		// TODO, check with identifier, since we have NOT implemented this we need to try to decrypt with our key
+		switch sdc.keyType {
+		case sssdoc.KeyTypeAge:
+			plaintextShare, err := sssdoc.AgeDecryptSingleShare(share, identity)
+			if err != nil {
+				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
+				continue
+			}
+			return plaintextShare, nil
+		case sssdoc.KeyTypePGP:
+			plaintextShare, err := sssdoc.GpgDecryptSingleShare(share, sdc.gpgPrivateKey)
+			if err != nil {
+				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
+				continue
+			}
+			return plaintextShare, nil
+		default:
+			return nil, fmt.Errorf("unknown key type %d", sdc.keyType)
+		}
+	}
+
+	return nil, fmt.Errorf("No matching share found")
+}
+
 func (sdc *ssdClient) PushShareToServer() error {
 	// check if ready (plaintext key loaded)
 	// get the server doc
@@ -284,49 +323,13 @@ func (sdc *ssdClient) PushShareToServer() error {
 	}
 	sdc.logger.Debug("Fetched and Parsed keyinfo document")
 
-	shareFound := false
-
-	var plaintextShare []byte
-shareDocLoop:
-	for i, share := range shareDoc.Shares {
-		// TODO, check with identifier, since we have NOT implemented this we need to try to decrypt with our key
-		switch sdc.keyType {
-		case sssdoc.KeyTypeAge:
-			// TODO we should actually move the switch outside the loop
-			idReader := bytes.NewReader([]byte(sdc.ptPrivateKey))
-			identity, err := age.ParseIdentities(idReader)
-			if err != nil {
-				return err
-			}
-
-			plaintextShare, err = sssdoc.AgeDecryptSingleShare(share, identity)
-			if err != nil {
-				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
-				continue
-			}
-			shareFound = true
-			break shareDocLoop
-		case sssdoc.KeyTypePGP:
-			plaintextShare, err = sssdoc.GpgDecryptSingleShare(share, sdc.gpgPrivateKey)
-			if err != nil {
-				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
-				continue
-			}
-			shareFound = true
-			break shareDocLoop
-		default:
-			return fmt.Errorf("unknown key type %d", sdc.keyType)
-		}
-	}
-	if !shareFound {
+	plaintextShare, err := sdc.findAndDecryptShare(shareDoc.Shares)
+	if err != nil {
 		sdc.logger.Debug("share not found", slog.String("shareDoc", string(serializedDoc)))
-		return fmt.Errorf("unable to decrypt any share with our private key, match not found")
+		return fmt.Errorf("unable to decrypt any share with our private key, match not found %w", err)
 	}
 	sdc.logger.Debug("Successfully Decrypted share from encryped doc")
 
-	//fmt.Printf("llen =%d", len(plaintextShare))
-
-	// BUG: we need to pass the hostname here!
 	encMsg, err := sssdoc.NewAgeEncryptedMessage(plaintextShare, []byte(keyInfo.AgePubKeys[0]), sdc.baseURL.Hostname(), keyInfo.Base64ReplayNonce)
 	if err != nil {
 		return err
