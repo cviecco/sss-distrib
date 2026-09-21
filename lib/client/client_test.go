@@ -38,7 +38,7 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 
 	//fmt.Printf("filedata=%s", string(filedata))
 
-	sc2, err := NewFromAgeFileWithPassphrase(filename, testPassphrase)
+	sc2, err := NewFromAgeFileWithPassphrase(filename, testPassphrase, logger)
 	require.NoError(t, err)
 	require.NotNil(t, sc2)
 

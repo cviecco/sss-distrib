@@ -162,6 +162,9 @@ type ClientCmd struct {
 }
 
 func (cl *ClientCmd) Run(ctx *Context) error {
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
 	f, err := os.Open(cl.KeyPath)
 	if err != nil {
 		return err
@@ -180,7 +183,7 @@ func (cl *ClientCmd) Run(ctx *Context) error {
 	}
 	// TODO, we should to some peeking to ensure we got the right type of
 	// key, for now we assume age encrypted key
-	sdclient, err := client.LoadAgeKeyWithPassPhraseAndReader(f, string(pass))
+	sdclient, err := client.LoadAgeKeyWithPassPhraseAndReader(f, string(pass), logger)
 	if err != nil {
 		fmt.Printf("cannot load key, bad passphrase?\n")
 		return nil

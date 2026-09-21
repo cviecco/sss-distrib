@@ -102,16 +102,16 @@ func ageEncrypt(recipients []age.Recipient, in io.Reader, out io.Writer, withArm
 }
 
 // The file is assumed to be an armored key file
-func NewFromAgeFileWithPassphrase(filepath string, passphrase string) (*ssdClient, error) {
+func NewFromAgeFileWithPassphrase(filepath string, passphrase string, logger *slog.Logger) (*ssdClient, error) {
 	fin, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
 	}
 	defer fin.Close()
-	return LoadAgeKeyWithPassPhraseAndReader(fin, passphrase)
+	return LoadAgeKeyWithPassPhraseAndReader(fin, passphrase, logger)
 }
 
-func LoadAgeKeyWithPassPhraseAndReader(keyReader io.ReadCloser, passphrase string) (*ssdClient, error) {
+func LoadAgeKeyWithPassPhraseAndReader(keyReader io.ReadCloser, passphrase string, logger *slog.Logger) (*ssdClient, error) {
 	sc := ssdClient{
 		//filePath: filePath,
 	}
