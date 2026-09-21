@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/cviecco/sss-distrib/lib/sssdoc"
+	"github.com/neilotoole/slogt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,6 +39,7 @@ o5qAAAoJEOgaLB5KL3cBniMBALEmun8x14Vi8wVNaxlzxXrhsqoCkvjO7xzE0fPv
 -----END PGP PRIVATE KEY BLOCK-----`
 
 func TestSimpleFileRoundTripAge(t *testing.T) {
+	logger := slogt.New(t)
 	dir, err := os.MkdirTemp("", "example")
 	require.NoError(t, err)
 
@@ -45,7 +47,7 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 
 	filename := filepath.Join(dir, "tmpfile")
 
-	sc1, err := NewAgeKeyWithPassPhrase(filename, testPassphrase, "http://example.com")
+	sc1, err := NewGenerateAgeKeyWithPassPhrase(filename, testPassphrase, "http://example.com", logger)
 	require.NoError(t, err)
 	require.NotNil(t, sc1)
 
@@ -57,7 +59,7 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 	//fmt.Printf("filedata=%s", string(filedata))
 
 	//sc2, err := LoadAgeKeyWithPassPhrase(filename, testPassphrase)
-	sc2, err := LoadArmoredKeyWithPassPhrase(filename, testPassphrase)
+	sc2, err := LoadArmoredKeyWithPassPhrase(filename, testPassphrase, logger)
 	require.NoError(t, err)
 	require.NotNil(t, sc2)
 
@@ -128,13 +130,15 @@ func TestPushToServer(t *testing.T) {
 
 	defer os.RemoveAll(dir) // clean up
 
+	logger := slogt.New(t)
+
 	filename1 := filepath.Join(dir, "tmpfile")
-	sc1, err := NewAgeKeyWithPassPhrase(filename1, testPassphrase, "http://example.com")
+	sc1, err := NewGenerateAgeKeyWithPassPhrase(filename1, testPassphrase, "http://example.com", logger)
 	require.NoError(t, err)
 	require.NotNil(t, sc1)
 
 	filename2 := filepath.Join(dir, "tmpfile2")
-	sc2, err := NewAgeKeyWithPassPhrase(filename2, testPassphrase, "http://example.com")
+	sc2, err := NewGenerateAgeKeyWithPassPhrase(filename2, testPassphrase, "http://example.com", logger)
 	require.NoError(t, err)
 	require.NotNil(t, sc2)
 
@@ -163,7 +167,6 @@ func TestPushToServer(t *testing.T) {
 	require.NoError(t, err)
 	processor.ProcesssingTarget = parsedServerURL.Hostname()
 
-	//sc1.BaseURL = ts.URL
 	err = sc1.SetBaseURL(ts.URL)
 	require.NoError(t, err)
 	sc1.client = ts.Client()
@@ -174,8 +177,9 @@ func TestPushToServer(t *testing.T) {
 }
 
 func TestLoadPGPGArmoredKey(t *testing.T) {
+	logger := slogt.New(t)
 	reader := bytes.NewReader([]byte(pgp_sss_test_1))
-	sdc, err := loadGPGKeyWithReaderAndPassPhrase(reader, testPassphrase)
+	sdc, err := loadGPGKeyWithReaderAndPassPhrase(reader, testPassphrase, logger)
 	require.NoError(t, err)
 	require.NotNil(t, sdc)
 
@@ -193,7 +197,7 @@ func TestLoadPGPGArmoredKey(t *testing.T) {
 	err = keyFile.Close()
 	require.NoError(t, err)
 
-	sdc2, err := LoadArmoredKeyWithPassPhrase(filename1, testPassphrase)
+	sdc2, err := LoadArmoredKeyWithPassPhrase(filename1, testPassphrase, logger)
 	require.NoError(t, err)
 	require.NotNil(t, sdc2)
 

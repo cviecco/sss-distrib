@@ -7,6 +7,7 @@ require (
 	github.com/ProtonMail/gopenpgp/v3 v3.4.1
 	github.com/alecthomas/kong v1.16.1
 	github.com/lydianpay/shamir-secret-sharing v1.0.2
+	github.com/neilotoole/slogt/v2 v2.0.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.45.0
 	golang.org/x/term v0.46.0
