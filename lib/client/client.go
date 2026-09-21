@@ -16,6 +16,7 @@ import (
 
 	"filippo.io/age"
 	agearmor "filippo.io/age/armor"
+	gpgcrypto "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/cviecco/sss-distrib/lib/sssdoc"
 )
 
@@ -28,10 +29,10 @@ func mainx() {
 //   - encrypted key
 //   - key passphrase
 type ssdClient struct {
-	BaseURL      *url.URL
-	ptPrivateKey []byte //serialized key in plaintext
+	BaseURL       *url.URL
+	ptPrivateKey  []byte //serialized key in plaintext for age
+	gpgPrivateKey *gpgcrypto.Key
 
-	//passphrase   string
 	filePath string
 	keyType  int // should be an enum
 	client   *http.Client
@@ -99,30 +100,90 @@ func ageEncrypt(recipients []age.Recipient, in io.Reader, out io.Writer, withArm
 	return nil
 }
 
-// The file is assumed to be an armored key file
-func LoadAgeKeyWithPassPhrase(filePath string, passphrase string) (*ssdClient, error) {
-	sc := ssdClient{
-		filePath: filePath,
+func guessKeyTypeFromArmoredBytes(data string) int {
+	if strings.Contains(data, "----BEGIN PGP") {
+		return sssdoc.KeyTypePGP
 	}
-	//identities := []age.Identity{} //Need to fix this one
+	if strings.Contains(data, "----BEGIN AGE") {
+		return sssdoc.KeyTypeAge
+	}
+	return sssdoc.KeyTypeUnknown
+}
 
-	identities, err := age.NewScryptIdentity(passphrase)
+const maxKeySize = 102400 //100K
+func LoadArmoredKeyWithPassPhrase(filepath string, passphrase string) (*ssdClient, error) {
+	fin, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
 	}
+	lr := io.LimitedReader{
+		R: fin,
+		N: maxKeySize,
+	}
+	armoredBytes, err := io.ReadAll(&lr)
+	if err != nil {
+		return nil, err
+	}
+
+	armoredReader := bytes.NewReader(armoredBytes)
+
+	switch guessKeyTypeFromArmoredBytes(string(armoredBytes)) {
+	case sssdoc.KeyTypeAge:
+		return loadAgeKeyWithReaderAndPassPhrase(armoredReader, passphrase)
+	case sssdoc.KeyTypePGP:
+		return loadGPGKeyWithReaderAndPassPhrase(armoredReader, passphrase)
+	default:
+		return nil, fmt.Errorf("unable to guess file type")
+	}
+
+}
+
+// The file is assumed to be an armored key file
+func LoadAgeKeyWithPassPhrase(filePath string, passphrase string) (*ssdClient, error) {
 
 	fin, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
+	return loadAgeKeyWithReaderAndPassPhrase(fin, passphrase)
+}
+
+func loadAgeKeyWithReaderAndPassPhrase(armoredReader io.Reader, passphrase string) (*ssdClient, error) {
+	sc := ssdClient{
+		//filePath: filePath,
+	}
+	identities, err := age.NewScryptIdentity(passphrase)
+	if err != nil {
+		return nil, err
+	}
+
 	var outBuffer bytes.Buffer
-	err = ageDecrypt(fin, &outBuffer, identities)
+	err = ageDecrypt(armoredReader, &outBuffer, identities)
 	if err != nil {
 		return nil, err
 	}
 	sc.ptPrivateKey = outBuffer.Bytes()
 	sc.client = http.DefaultClient //TODO, we need our own with sensible timeouts
 	sc.keyType = sssdoc.KeyTypeAge
+	return &sc, nil
+
+}
+
+func loadGPGKeyWithReaderAndPassPhrase(armoredReader io.Reader, passphrase string) (*ssdClient, error) {
+	//load reader into []bytes
+	armoredPrivate, err := io.ReadAll(armoredReader)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, err := gpgcrypto.NewPrivateKeyFromArmored(string(armoredPrivate), []byte(passphrase))
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse armored gpg private key: %w", err)
+	}
+	sc := ssdClient{
+		gpgPrivateKey: privateKey,
+		client:        http.DefaultClient,
+		keyType:       sssdoc.KeyTypePGP,
+	}
 	return &sc, nil
 }
 
@@ -155,12 +216,23 @@ func (sdc *ssdClient) SetBaseURL(urlBase string) error {
 }
 
 func (sdc *ssdClient) GetPublicKey() ([]byte, error) {
-	pqident, err := age.ParseHybridIdentity(string(sdc.ptPrivateKey))
-	if err != nil {
-		return nil, err
+	switch sdc.keyType {
+	case sssdoc.KeyTypePGP:
+		gpgPub, err := sdc.gpgPrivateKey.GetArmoredPublicKey()
+		if err != nil {
+			return nil, err
+		}
+		return []byte(gpgPub), nil
+	case sssdoc.KeyTypeAge:
+		pqident, err := age.ParseHybridIdentity(string(sdc.ptPrivateKey))
+		if err != nil {
+			return nil, err
+		}
+		publicKey := pqident.Recipient().String()
+		return []byte(publicKey), nil
+	default:
+		return nil, fmt.Errorf("key type not supported")
 	}
-	publicKey := pqident.Recipient().String()
-	return []byte(publicKey), nil
 }
 
 func (sdc *ssdClient) GetSuccessFullBytesFromRequest(r *http.Request) ([]byte, error) {

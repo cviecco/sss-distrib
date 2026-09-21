@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,25 @@ import (
 
 const testPassphrase = "12345" // same as my lugggage
 const ageArmorPrefix = "-----BEGIN AGE ENCRYPTED FILE-----"
+
+const pgp_sss_test_1 = `-----BEGIN PGP PRIVATE KEY BLOCK-----
+
+lIYEanuV0RYJKwYBBAHaRw8BAQdAreB93UG39zZbszjm4qZAPkLIsTZzFiJ0EkZm
+4D3h9IX+BwMCTFbqe4/9FiL/SYTNV1eQnYN5VZOIwN3sEPL/fPkTB/pf0nm07Pol
+SLo4VPYiLXIcR4dt1KSmx/tHEgM4aQVrbTWsSV8fvlZFFEM/MGC5KrQrc3NzX3Rl
+c3Rfa2V5XzEgPHNzc190ZXN0X2tleV8xQGV4YW1wbGUuY29tPoi1BBMWCgBdFiEE
+75wm5LSQ1mcsE+kP6BosHkovdwEFAmp7ldEbFIAAAAAABAAObWFudTIsMi41KzEu
+MTIsMCwzAhsDBQkFo5qABQsJCAcCAiICBhUKCQgLAgQWAgMBAh4HAheAAAoJEOga
+LB5KL3cB4KIBANir8Gw1Y8E1xL2TAtIuHEatoSY2GczBa/5m/IOxHo7wAQCLgoDl
+sQvk/mK3Wzad4gbhAQboy3pqngwxvAazpDvnApyLBGp7ldESCisGAQQBl1UBBQEB
+B0BYOaOjpP3NqtQAaI9FdVvRYrR1xiZ/HmovJfibrq/8JgMBCAf+BwMCKVb6Rp6U
+/k3/w9qhxMHuD71aglHVJrryJXjnIgnbm4g+vMewjXnVkTdRpsDuTJyEx/8hUPqi
+2QtOGRK6Xib96W1T88RNxoGtbkcOeUmE7YiaBBgWCgBCFiEE75wm5LSQ1mcsE+kP
+6BosHkovdwEFAmp7ldEbFIAAAAAABAAObWFudTIsMi41KzEuMTIsMCwzAhsMBQkF
+o5qAAAoJEOgaLB5KL3cBniMBALEmun8x14Vi8wVNaxlzxXrhsqoCkvjO7xzE0fPv
+2Wd3AQDr7IcJYSptY4uDFiu7pFr2NkYpHZ6ttZ8B2XphCIGECQ==
+=2wd5
+-----END PGP PRIVATE KEY BLOCK-----`
 
 func TestSimpleFileRoundTripAge(t *testing.T) {
 	dir, err := os.MkdirTemp("", "example")
@@ -36,7 +56,8 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 
 	//fmt.Printf("filedata=%s", string(filedata))
 
-	sc2, err := LoadAgeKeyWithPassPhrase(filename, testPassphrase)
+	//sc2, err := LoadAgeKeyWithPassPhrase(filename, testPassphrase)
+	sc2, err := LoadArmoredKeyWithPassPhrase(filename, testPassphrase)
 	require.NoError(t, err)
 	require.NotNil(t, sc2)
 
@@ -50,6 +71,7 @@ func TestSimpleFileRoundTripAge(t *testing.T) {
 	pub2, err := sc2.GetPublicKey()
 	require.NoError(t, err)
 	require.Equal(t, pub1, pub2)
+
 }
 
 func TestGetSuccessfullBytesFromRequest(t *testing.T) {
@@ -148,5 +170,36 @@ func TestPushToServer(t *testing.T) {
 
 	err = sc1.PushShareToServer()
 	require.NoError(t, err) //This is busted, but fix needs changes in the server side
+
+}
+
+func TestLoadPGPGArmoredKey(t *testing.T) {
+	reader := bytes.NewReader([]byte(pgp_sss_test_1))
+	sdc, err := loadGPGKeyWithReaderAndPassPhrase(reader, testPassphrase)
+	require.NoError(t, err)
+	require.NotNil(t, sdc)
+
+	//Now with the generic entry
+	dir, err := os.MkdirTemp("", "example")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(dir) // clean up
+
+	filename1 := filepath.Join(dir, "tmpfile")
+	keyFile, err := os.OpenFile(filename1, os.O_RDWR|os.O_CREATE, 0644)
+	require.NoError(t, err)
+	_, err = keyFile.WriteString(pgp_sss_test_1)
+	require.NoError(t, err)
+	err = keyFile.Close()
+	require.NoError(t, err)
+
+	sdc2, err := LoadArmoredKeyWithPassPhrase(filename1, testPassphrase)
+	require.NoError(t, err)
+	require.NotNil(t, sdc2)
+
+	pub1, err := sdc.GetPublicKey()
+	require.NoError(t, err)
+	pub2, err := sdc2.GetPublicKey()
+	require.Equal(t, pub1, pub2)
 
 }
