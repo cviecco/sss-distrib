@@ -44,6 +44,29 @@ func (doc *SssProcessor) GetShareStatusHandler(w http.ResponseWriter, r *http.Re
 	}
 }
 
+func (sd *SssProcessor) serveShareDocHandlerInternal(w http.ResponseWriter, r *http.Request) error {
+	if sd.Doc == nil {
+		return fmt.Errorf("No loaded doc")
+	}
+	payload, err := json.Marshal(sd.Doc)
+	if err != nil {
+		return fmt.Errorf("unable to marshal Doc")
+	}
+	// all errors after this are due to network errors and are not recoverable
+	// this will be ignored
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(payload)
+	return nil
+}
+
+func (sd *SssProcessor) ServeShareDocHandler(w http.ResponseWriter, r *http.Request) {
+	err := sd.serveShareDocHandlerInternal(w, r)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+	return
+}
+
 type SssKexchangeKeys struct {
 	AgePubKeys        []string `json:"age_pub_keys"`
 	Base64ReplayNonce string   `json:"b64_replay_nonce"`
