@@ -69,6 +69,7 @@ func (gd *GenDocCmd) Run(ctx *Context) error {
 
 type GenNewEncAgeKey struct {
 	OutputPath string `arg:"" name:"output" help:"FileOutputPath." type:"path"`
+	passphrase string //this is only for testing DONT USE
 }
 
 func (gnak *GenNewEncAgeKey) Run(ctx *Context) error {
@@ -80,12 +81,17 @@ func (gnak *GenNewEncAgeKey) Run(ctx *Context) error {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	// TODO generate passphrase on empty
-	fmt.Println("please enter your passphrase:")
-	pass, err := term.ReadPassword(int(os.Stdin.Fd()))
-	if err != nil {
-		return err
+	passphrase := gnak.passphrase
+	if passphrase == "" {
+		fmt.Println("please enter your passphrase:")
+		pass, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			return err
+		}
+		passphrase = string(pass)
 	}
-	sdclient, err := client.NewGenerateAgeKeyWithPassPhrase(gnak.OutputPath, string(pass), "someurl", logger)
+	sdclient, err := client.NewGenerateAgeKeyWithPassPhrase(
+		gnak.OutputPath, passphrase, "someurl", logger)
 	if err != nil {
 		return err
 	}
