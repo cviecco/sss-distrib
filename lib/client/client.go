@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"filippo.io/age"
@@ -18,10 +19,6 @@ import (
 	gpgcrypto "github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/cviecco/sss-distrib/lib/sssdoc"
 )
-
-func mainx() {
-	fmt.Println("vim-go")
-}
 
 // We need 3 things:
 //   - url
@@ -33,33 +30,37 @@ type ssdClient struct {
 	gpgPrivateKey *gpgcrypto.Key
 
 	filePath string
-	keyType  int // should be an enum
+	keyType  int // This reuses the doc key types
 	client   *http.Client
 
 	logger *slog.Logger
 }
 
-// almost like: "age-keygen |age -p -a"
+// This fuct
+// like: "age-keygen | grep SECRET |age -p -a"
 func NewGenerateAgeKeyWithPassPhrase(outPath string, passphrase string, urlBase string, logger *slog.Logger) (*ssdClient, error) {
-	parsedURL, err := url.Parse(urlBase)
-	if err != nil {
-		return nil, err
-	}
-	sc := ssdClient{
-		baseURL:  parsedURL,
-		filePath: outPath,
-		logger:   logger,
-	}
-	agePQKey, err := age.GenerateHybridIdentity()
-	if err != nil {
-		return nil, err
-	}
-
 	out, err := os.OpenFile(outPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}
 	defer out.Close()
+	return newArmoredAgeKeyWithReaderAndPassphrase(out, passphrase, urlBase, logger)
+}
+
+func newArmoredAgeKeyWithReaderAndPassphrase(out io.Writer, passphrase string, urlBase string, logger *slog.Logger) (*ssdClient, error) {
+	parsedURL, err := url.Parse(urlBase)
+	if err != nil {
+		return nil, err
+	}
+	sc := ssdClient{
+		baseURL: parsedURL,
+		//filePath: outPath,
+		logger: logger,
+	}
+	agePQKey, err := age.GenerateHybridIdentity()
+	if err != nil {
+		return nil, err
+	}
 
 	sc.ptPrivateKey = []byte(agePQKey.String())
 
@@ -118,14 +119,15 @@ func LoadArmoredKeyWithPassPhrase(filepath string, passphrase string, logger *sl
 	if err != nil {
 		return nil, err
 	}
+	defer fin.Close()
+	return LoadArmoredKeyWithReaderAndPassPhrase(fin, passphrase, logger)
+}
+func LoadArmoredKeyWithReaderAndPassPhrase(fin io.Reader, passphrase string, logger *slog.Logger) (*ssdClient, error) {
 	lr := io.LimitedReader{
 		R: fin,
 		N: maxKeySize,
 	}
-	return LoadArmoredKeyWithReaderAndPassPhrase(&lr, passphrase, logger)
-}
-func LoadArmoredKeyWithReaderAndPassPhrase(lr io.Reader, passphrase string, logger *slog.Logger) (*ssdClient, error) {
-	armoredBytes, err := io.ReadAll(lr)
+	armoredBytes, err := io.ReadAll(&lr)
 	if err != nil {
 		return nil, err
 	}
@@ -140,16 +142,6 @@ func LoadArmoredKeyWithReaderAndPassPhrase(lr io.Reader, passphrase string, logg
 	default:
 		return nil, fmt.Errorf("unable to guess file type")
 	}
-}
-
-// The file is assumed to be an armored key file
-func LoadAgeKeyWithPassPhrase(filePath string, passphrase string, logger *slog.Logger) (*ssdClient, error) {
-
-	fin, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	return loadAgeKeyWithReaderAndPassPhrase(fin, passphrase, logger)
 }
 
 func loadAgeKeyWithReaderAndPassPhrase(armoredReader io.Reader, passphrase string, logger *slog.Logger) (*ssdClient, error) {
@@ -241,6 +233,22 @@ func (sdc *ssdClient) GetPublicKey() ([]byte, error) {
 	}
 }
 
+// Truncates to max bytes and escapes values from incomins tring
+const maxloggableStringSize = 1000
+
+func getLoggableString(in []byte) string {
+	if in == nil {
+		return ""
+	}
+	var truncated []byte
+	if len(in) > maxloggableStringSize {
+		truncated = in[:maxloggableStringSize]
+	} else {
+		truncated = in
+	}
+	return strconv.QuoteToASCII(string(truncated))
+}
+
 func (sdc *ssdClient) GetSuccessFullBytesFromRequest(r *http.Request) ([]byte, error) {
 	resp, err := sdc.client.Do(r)
 	if err != nil {
@@ -252,9 +260,49 @@ func (sdc *ssdClient) GetSuccessFullBytesFromRequest(r *http.Request) ([]byte, e
 		return nil, fmt.Errorf("unable to read request body, resp code=%d err=%s", resp.StatusCode, err)
 	}
 	if resp.StatusCode != http.StatusOK {
+		stringToLog := getLoggableString(respBytes)
+		sdc.logger.Debug("Not an OK response from server",
+			slog.String("responsebody", stringToLog))
+
 		return respBytes, fmt.Errorf("invalid status got %d", resp.StatusCode)
 	}
 	return respBytes, nil
+}
+
+func (sdc *ssdClient) findAndDecryptShare(shares []sssdoc.EncrypedShare) ([]byte, error) {
+	var identity []age.Identity
+	var err error
+	if sdc.keyType == sssdoc.KeyTypeAge {
+		idReader := bytes.NewReader([]byte(sdc.ptPrivateKey))
+		identity, err = age.ParseIdentities(idReader)
+		if err != nil {
+			return nil, err
+		}
+	}
+	//var plaintextShare []byte
+	for i, share := range shares {
+		// TODO, check with identifier, since we have NOT implemented this we need to try to decrypt with our key
+		switch sdc.keyType {
+		case sssdoc.KeyTypeAge:
+			plaintextShare, err := sssdoc.AgeDecryptSingleShare(share, identity)
+			if err != nil {
+				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
+				continue
+			}
+			return plaintextShare, nil
+		case sssdoc.KeyTypePGP:
+			plaintextShare, err := sssdoc.GpgDecryptSingleShare(share, sdc.gpgPrivateKey)
+			if err != nil {
+				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
+				continue
+			}
+			return plaintextShare, nil
+		default:
+			return nil, fmt.Errorf("unknown key type %d", sdc.keyType)
+		}
+	}
+
+	return nil, fmt.Errorf("No matching share found")
 }
 
 func (sdc *ssdClient) PushShareToServer() error {
@@ -296,49 +344,13 @@ func (sdc *ssdClient) PushShareToServer() error {
 	}
 	sdc.logger.Debug("Fetched and Parsed keyinfo document")
 
-	shareFound := false
-
-	var plaintextShare []byte
-shareDocLoop:
-	for i, share := range shareDoc.Shares {
-		// TODO, check with identifier, since we have NOT implemented this we need to try to decrypt with our key
-		switch sdc.keyType {
-		case sssdoc.KeyTypeAge:
-			// TODO we should actually move the switch outside the loop
-			idReader := bytes.NewReader([]byte(sdc.ptPrivateKey))
-			identity, err := age.ParseIdentities(idReader)
-			if err != nil {
-				return err
-			}
-
-			plaintextShare, err = sssdoc.AgeDecryptSingleShare(share, identity)
-			if err != nil {
-				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
-				continue
-			}
-			shareFound = true
-			break shareDocLoop
-		case sssdoc.KeyTypePGP:
-			plaintextShare, err = sssdoc.GpgDecryptSingleShare(share, sdc.gpgPrivateKey)
-			if err != nil {
-				sdc.logger.Debug("Share is not ours.", slog.Int("Index", i))
-				continue
-			}
-			shareFound = true
-			break shareDocLoop
-		default:
-			return fmt.Errorf("unknown key type %d", sdc.keyType)
-		}
-	}
-	if !shareFound {
+	plaintextShare, err := sdc.findAndDecryptShare(shareDoc.Shares)
+	if err != nil {
 		sdc.logger.Debug("share not found", slog.String("shareDoc", string(serializedDoc)))
-		return fmt.Errorf("unable to decrypt any share with our private key, match not found")
+		return fmt.Errorf("unable to decrypt any share with our private key, match not found %w", err)
 	}
 	sdc.logger.Debug("Successfully Decrypted share from encryped doc")
 
-	//fmt.Printf("llen =%d", len(plaintextShare))
-
-	// BUG: we need to pass the hostname here!
 	encMsg, err := sssdoc.NewAgeEncryptedMessage(plaintextShare, []byte(keyInfo.AgePubKeys[0]), sdc.baseURL.Hostname(), keyInfo.Base64ReplayNonce)
 	if err != nil {
 		return err
