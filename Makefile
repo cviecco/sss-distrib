@@ -4,15 +4,15 @@ test:
 	go test ./...
 
 
-coverage.out:
-	go test -coverprofile=coverage.out ./...
+coverage.txt:
+	go test -coverprofile=coverage.txt ./...
 
 
 
-coverview: coverage.out
-	go tool cover -html=coverage.out
+coverview: coverage.txt
+	go tool cover -html=coverage.txt
 
 
 clean:
 	rm -f bin/*
-	rm -f coverage.out
+	rm -f coverage.txt
