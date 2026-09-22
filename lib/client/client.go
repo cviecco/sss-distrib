@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"filippo.io/age"
@@ -232,6 +233,22 @@ func (sdc *ssdClient) GetPublicKey() ([]byte, error) {
 	}
 }
 
+// Truncates to max bytes and escapes values from incomins tring
+const maxloggableStringSize = 1000
+
+func getLoggableString(in []byte) string {
+	if in == nil {
+		return ""
+	}
+	var truncated []byte
+	if len(in) > maxloggableStringSize {
+		truncated = in[:maxloggableStringSize]
+	} else {
+		truncated = in
+	}
+	return strconv.QuoteToASCII(string(truncated))
+}
+
 func (sdc *ssdClient) GetSuccessFullBytesFromRequest(r *http.Request) ([]byte, error) {
 	resp, err := sdc.client.Do(r)
 	if err != nil {
@@ -243,6 +260,10 @@ func (sdc *ssdClient) GetSuccessFullBytesFromRequest(r *http.Request) ([]byte, e
 		return nil, fmt.Errorf("unable to read request body, resp code=%d err=%s", resp.StatusCode, err)
 	}
 	if resp.StatusCode != http.StatusOK {
+		stringToLog := getLoggableString(respBytes)
+		sdc.logger.Debug("Not an OK response from server",
+			slog.String("responsebody", stringToLog))
+
 		return respBytes, fmt.Errorf("invalid status got %d", resp.StatusCode)
 	}
 	return respBytes, nil

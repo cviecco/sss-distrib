@@ -88,9 +88,11 @@ func TestGetSuccessfullBytesFromRequest(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	logger := slogt.New(t)
 	client := ssdClient{
 		//BaseURL: ts.URL,
 		client: ts.Client(),
+		logger: logger,
 	}
 	err := client.SetBaseURL(ts.URL)
 	require.NoError(t, err)
@@ -213,5 +215,8 @@ func TestFindAndDecryptShare(t *testing.T) {
 	sdc, err := newArmoredAgeKeyWithReaderAndPassphrase(&outBuffer, testPassphrase, "http://example.com", logger)
 	require.NoError(t, err)
 	require.NotNil(t, sdc)
+
+	_, err = sdc.GetPublicKey()
+	require.NoError(t, err)
 
 }
