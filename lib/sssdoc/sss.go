@@ -2,7 +2,6 @@ package sssdoc
 
 import (
 	"crypto/rand"
-	"fmt"
 
 	shamir "github.com/lydianpay/shamir-secret-sharing"
 )
@@ -17,23 +16,6 @@ func generateSecret() ([]byte, error) {
 	}
 	return rb[:], nil
 
-}
-
-func generateAndSplitSecret(threshold int, numshares int) ([][]byte, error) {
-
-	if numshares < 2 || numshares > 32 {
-		return nil, fmt.Errorf("invalid number of shares")
-	}
-	if threshold >= numshares || threshold < 2 {
-		return nil, fmt.Errorf("invalid number of combiners")
-	}
-
-	secret, err := generateSecret()
-	if err != nil {
-		return nil, err
-	}
-
-	return withSecretGenerateSecretShares(secret, threshold, numshares)
 }
 
 func withSecretGenerateSecretShares(secret []byte, threshold int, numshares int) ([][]byte, error) {

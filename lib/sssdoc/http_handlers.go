@@ -143,31 +143,6 @@ type processEncrypedShareParams struct {
 	EncrypedShare []byte
 }
 
-func (doc *SssProcessor) ProcessEncryptedShareFromParams(params processEncrypedShareParams) (usererr error, internalerr error) {
-	//decrpt the share
-	agePQrecipient := doc.agePQKey
-	idReader := bytes.NewReader([]byte(agePQrecipient.String()))
-	identity, err := age.ParseIdentities(idReader)
-	if err != nil {
-		// TODO, dont do the +%v
-		return nil, fmt.Errorf("unable to decrypt parse identities fail  %w", err)
-	}
-	encReader := bytes.NewReader(params.EncrypedShare)
-	plaintextReader, err := age.Decrypt(encReader, identity...)
-	if err != nil {
-		// TODO, dont do the +%v
-		return fmt.Errorf("unable to decrypt  %w", err), nil
-	}
-	plaintextShare, err := io.ReadAll(plaintextReader)
-	if err != nil {
-		// TODO, dont do the +%v
-		return nil, fmt.Errorf("unable to readdecrypted bytes  %w", err)
-	}
-	// Here we check for replay + id
-	_, err = doc.ProcessShare(plaintextShare)
-	return nil, err
-}
-
 func (doc *SssProcessor) ProcessEncrypedShareMessageFromParams(params processEncrypedShareParams) (usererr error, internalerr error) {
 	plaintextShare, err := DecryptValidateAgeMessage(params.EncrypedShare, []byte(doc.agePQKey.String()), doc.ProcesssingTarget, doc.rProtector)
 	if err != nil {
