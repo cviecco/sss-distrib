@@ -7,10 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"sync"
-	"time"
 
 	"filippo.io/age"
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
@@ -115,23 +113,6 @@ func NewProcessorFromShareDoc(sd *ShareDoc) (*SssProcessor, error) {
 		return nil, err
 	}
 	return &rvalue, nil
-}
-
-const maxNonceQueueSize = 10
-const nonceRefreshRate = 5 * time.Second
-
-func (sp *SssProcessor) StartNonceRotation() error {
-	for true {
-		newNonce := []byte("xxx")
-		sp.nonceMutex.Lock()
-		sp.messageNonces = append(sp.messageNonces, newNonce)
-		if len(sp.messageNonces) > maxNonceQueueSize {
-			sp.messageNonces = sp.messageNonces[1:] // drop 0th element
-		}
-		sp.nonceMutex.Unlock()
-		time.Sleep(nonceRefreshRate)
-	}
-	return nil
 }
 
 const randomStringEntropyBytes = 32
@@ -267,42 +248,3 @@ func (sd *SssProcessor) ProcessShare(plaintextShare []byte) ([]byte, error) {
 }
 
 const httpReaderMaxBytes = 65535
-
-func (sd *SssProcessor) serveShareDocHandlerInternal(w http.ResponseWriter, r *http.Request) error {
-	if sd.Doc == nil {
-		return fmt.Errorf("No loaded doc")
-	}
-	payload, err := json.Marshal(sd.Doc)
-	if err != nil {
-		return fmt.Errorf("unable to marshal Doc")
-	}
-	// all errors after this are due to network errors and are not recoverable
-	// this will be ignored
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Write(payload)
-	return nil
-}
-
-func (sd *SssProcessor) ServeShareDocHandler(w http.ResponseWriter, r *http.Request) {
-	err := sd.serveShareDocHandlerInternal(w, r)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-	}
-	return
-}
-
-/*
-type shareHandlerParams struct {
-	PlaintextShare
-}
-*/
-
-// this one is anonymous
-func (sd *SssProcessor) ProcessPlaintextShareHandler(w http.ResponseWriter, r *http.Request) {
-	//Need to add some CSRF protection
-	r.Body = http.MaxBytesReader(w, r.Body, httpReaderMaxBytes)
-	if r.Method != http.MethodPost {
-		http.Error(w, "invalid method", http.StatusInternalServerError)
-	}
-
-}

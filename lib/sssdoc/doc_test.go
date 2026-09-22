@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"filippo.io/age"
@@ -211,4 +213,33 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+}
+
+// Created by claude (sonnet 5)
+func TestLoadMultifiles(t *testing.T) {
+	dir := t.TempDir()
+
+	contents := [][]byte{
+		[]byte("contents of file one"),
+		[]byte("contents of file two"),
+	}
+
+	var paths []string
+	for i, content := range contents {
+		path := filepath.Join(dir, fmt.Sprintf("file%d.txt", i))
+		err := os.WriteFile(path, content, 0644)
+		require.NoError(t, err)
+		paths = append(paths, path)
+	}
+
+	loaded, err := LoadMultifiles(paths)
+	require.NoError(t, err)
+	require.Equal(t, len(contents), len(loaded))
+	for i, content := range contents {
+		require.Equal(t, content, loaded[i])
+	}
+
+	// A missing file should produce an error.
+	_, err = LoadMultifiles(append(paths, filepath.Join(dir, "does-not-exist.txt")))
+	require.Error(t, err)
 }

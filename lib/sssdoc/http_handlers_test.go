@@ -73,6 +73,33 @@ func TestGetShareStatusHandler(t *testing.T) {
 
 }
 
+// Generated via claude (sonnet 5)
+func TestServeShareDocHandler(t *testing.T) {
+	_, sd, _, err := generateBaseTestingDoc(t)
+	require.NoError(t, err)
+	req := httptest.NewRequest("GET", "/foo", nil)
+	w := httptest.NewRecorder()
+
+	sd.ServeShareDocHandler(w, req)
+	resp := w.Result()
+	body, _ := io.ReadAll(resp.Body)
+	require.Equal(t, resp.StatusCode, 200)
+
+	//content type check
+	require.Equal(t, resp.Header.Get("Content-Type"), jsonResponseContentType)
+
+	// Data check
+	var returnedDoc ShareDoc
+	err = json.Unmarshal(body, &returnedDoc)
+	require.NoError(t, err)
+
+	require.Equal(t, sd.Doc.RequiredShares, returnedDoc.RequiredShares)
+	require.Equal(t, len(sd.Doc.Shares), len(returnedDoc.Shares))
+	for i, share := range sd.Doc.Shares {
+		require.Equal(t, share.Identifier, returnedDoc.Shares[i].Identifier)
+	}
+}
+
 func TestGetKeyExchangePublicKeysHandler(t *testing.T) {
 	_, sd, _, err := generateBaseTestingDoc(t)
 	require.NoError(t, err)
