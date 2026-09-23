@@ -10,6 +10,7 @@ import (
 
 	"filippo.io/age"
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
+	"github.com/neilotoole/slogt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,18 +99,22 @@ func TestGenerateBase(t *testing.T) {
 		"age1j3nhn07hllphue7d8n675csazfku8969c8j82g7kkfs0cepcpqfs9qykdz",
 	}
 	var recipients [][]byte
-	identities := []string{"1", "2", "3"}
-	for i, recipient := range recipientsStrings {
+	//identities := []string{"1", "2", "3"}
+	for _, recipient := range recipientsStrings {
 		recipients = append(recipients, []byte(recipient))
-		identities[i] = fmt.Sprintf("%d", i)
+		//identities[i] = fmt.Sprintf("%d", i)
 	}
-	_, err := GenerateNewDocFromKeysAndIdentifiers(recipients, identities, 2)
+	//_, err := GenerateNewDocFromKeysAndIdentifiers(recipients, identities, 2)
+	_, err := GenerateNewDocFromKeys(recipients, 2)
 
 	//_, err := newFromAgeKeysInternal(recipients, identities, 2)
 	require.NoError(t, err)
+
 }
 
 func TestCreateDecodeRoundTrip(t *testing.T) {
+	logger := slogt.New(t)
+
 	secret, err := generateSecret()
 	require.NoError(t, err)
 
@@ -147,7 +152,7 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
 
-	sssDoc, err := NewProcessorFromShareDoc(shareDoc)
+	sssDoc, err := NewProcessorFromShareDoc(shareDoc, logger)
 	require.NoError(t, err)
 	require.NotNil(t, sssDoc)
 
@@ -164,6 +169,7 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 }
 
 func TestGpgCreateDecodeRoundTrip(t *testing.T) {
+	logger := slogt.New(t)
 	secret, err := generateSecret()
 	require.NoError(t, err)
 
@@ -199,7 +205,7 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 	// Test serialization too
 	serializedShareDoc, err := json.Marshal(shareDoc)
 	require.NoError(t, err)
-	sssDoc, err := NewProcessorFromShareDocJSON(serializedShareDoc)
+	sssDoc, err := NewProcessorFromShareDocJSON(serializedShareDoc, logger)
 	require.NoError(t, err)
 	require.NotNil(t, sssDoc)
 

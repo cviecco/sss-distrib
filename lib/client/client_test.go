@@ -157,7 +157,7 @@ func TestPushToServer(t *testing.T) {
 
 	doc, err := sssdoc.GenerateNewDocFromKeys(publicKeys, 2)
 	require.NoError(t, err)
-	processor, err := sssdoc.NewProcessorFromShareDoc(doc)
+	processor, err := sssdoc.NewProcessorFromShareDoc(doc, logger)
 	require.NoError(t, err)
 
 	mux := http.NewServeMux()
@@ -241,9 +241,8 @@ func TestFindAndDecryptShareCases(t *testing.T) {
 	agePub := []byte(ageIdentity.Recipient().String())
 
 	// Build a share doc with one age share and one gpg share.
-	shareDoc, err := sssdoc.GenerateNewDocFromKeysAndIdentifiers(
+	shareDoc, err := sssdoc.GenerateNewDocFromKeys(
 		[][]byte{agePub, gpgPub},
-		[]string{"age-share", "gpg-share"},
 		2,
 	)
 	require.NoError(t, err)

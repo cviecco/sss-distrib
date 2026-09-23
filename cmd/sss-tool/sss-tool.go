@@ -117,6 +117,7 @@ func (gnak *GenNewEncAgeKey) Run(ctx *Context) error {
 type ServerDemoCmd struct {
 	ListenPort int    `name:"port" default:"8080" help:"port to attach to (localhost)" `
 	DocPath    string `name:"docpath" type:"path"`
+	server     *http.Server
 }
 
 func (scommand *ServerDemoCmd) Run(ctx *Context) error {
@@ -130,7 +131,8 @@ func (scommand *ServerDemoCmd) Run(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-	processor, err := sssdoc.NewProcessorFromShareDocJSON(serializedDoc)
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	processor, err := sssdoc.NewProcessorFromShareDocJSON(serializedDoc, logger)
 	if err != nil {
 		return err
 	}
@@ -147,7 +149,7 @@ func (scommand *ServerDemoCmd) Run(ctx *Context) error {
 	}
 	processor.ProcesssingTarget = host
 
-	server := &http.Server{
+	scommand.server = &http.Server{
 		Addr:           addr,
 		Handler:        mux,
 		ReadTimeout:    10 * time.Second,
@@ -155,7 +157,7 @@ func (scommand *ServerDemoCmd) Run(ctx *Context) error {
 		MaxHeaderBytes: 1 << 20,
 	}
 	fmt.Printf("starting server at %s\n", addr)
-	err = server.ListenAndServe()
+	err = scommand.server.ListenAndServe()
 	if err != nil {
 		return err
 	}
