@@ -202,7 +202,13 @@ func gpgDecryptSingleShareWithPassPhrase(share EncrypedShare, armoredPrivate []b
 
 func GpgDecryptSingleShare(share EncrypedShare, privateKey *crypto.Key) ([]byte, error) {
 	pgp := crypto.PGP()
-	decHandle, err := pgp.Decryption().DecryptionKey(privateKey).New()
+	// Since dechandle.ClearPrivateParams also clears the private key
+	// we make a copy so that the incoming key is not modified
+	keyCopy, err := privateKey.Copy()
+	if err != nil {
+		return nil, fmt.Errorf("unable to copy gpg private key: %w", err)
+	}
+	decHandle, err := pgp.Decryption().DecryptionKey(keyCopy).New()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create gpg decryption handle: %w", err)
 	}
