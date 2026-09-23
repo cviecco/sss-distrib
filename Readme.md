@@ -1,3 +1,7 @@
+# sss-distrib
+
+[![Test](https://github.com/cviecco/sss-distrib/actions/workflows/test.yml/badge.svg)](https://github.com/cviecco/sss-distrib/actions/workflows/test.yml)
+
 
 Its 2026 and Johnny cannot encrypt file long term. 
 GPG works, but is combersome to use. However has lots of tooling around to make it work
