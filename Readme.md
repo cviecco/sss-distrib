@@ -2,7 +2,20 @@
 
 [![Test](https://github.com/cviecco/sss-distrib/actions/workflows/test.yml/badge.svg)](https://github.com/cviecco/sss-distrib/actions/workflows/test.yml)
 
+Across several projects I have come with the need to share sss (shamir secret sharing) shares with users.
+However to do so securely you need to encrypt each share with somthing that only the user can use
+to extract the share. In addition since this is usualy part of a bootstrap protocol mTLS is usually
+not available and given the prominence of TLS interception points I also want the passing of the share
+to the backen to be also encrypted.
 
+Thus there was a need for a library that:
+* Given a set public keys and a threshold is able to generate encryped share for each public key.
+* This generation will be in the form of a single document so that users only need to worry about keeping 
+their private keys. All other information will be kept in the document
+* A server
+
+
+#### Users public Key format
 Its 2026 and Johnny cannot encrypt file long term. 
 GPG works, but is combersome to use. However has lots of tooling around to make it work
 AGE nice cyptography, trusting the filesystem by default is not workable for long term secrets.
