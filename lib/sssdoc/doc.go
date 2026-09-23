@@ -202,10 +202,8 @@ func gpgDecryptSingleShareWithPassPhrase(share EncrypedShare, armoredPrivate []b
 
 func GpgDecryptSingleShare(share EncrypedShare, privateKey *crypto.Key) ([]byte, error) {
 	pgp := crypto.PGP()
-	// ClearPrivateParams (below) zeroes the private key material of the key
-	// the handle was built with, in place. Since callers (e.g. findAndDecryptShare)
-	// may try the same *Key against multiple shares, decrypt with a copy so a
-	// non-matching attempt doesn't destroy the key for subsequent attempts.
+	// Since dechandle.ClearPrivateParams also clears the private key
+	// we make a copy so that the incoming key is not modified
 	keyCopy, err := privateKey.Copy()
 	if err != nil {
 		return nil, fmt.Errorf("unable to copy gpg private key: %w", err)
