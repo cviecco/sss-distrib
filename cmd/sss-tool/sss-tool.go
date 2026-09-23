@@ -121,6 +121,14 @@ type ServerDemoCmd struct {
 }
 
 func (scommand *ServerDemoCmd) Run(ctx *Context) error {
+	var programLevel = new(slog.LevelVar) // Info by default
+	if ctx.Debug {
+		programLevel.Set(slog.LevelDebug)
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr,
+		&slog.HandlerOptions{Level: programLevel}))
+
 	//load processor from path
 	f, err := os.Open(scommand.DocPath)
 	if err != nil {
@@ -131,7 +139,7 @@ func (scommand *ServerDemoCmd) Run(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
 	processor, err := sssdoc.NewProcessorFromShareDocJSON(serializedDoc, logger)
 	if err != nil {
 		return err
@@ -165,8 +173,9 @@ func (scommand *ServerDemoCmd) Run(ctx *Context) error {
 }
 
 type ClientCmd struct {
-	ServerURL string `name:"server" default:"http://127.0.0.1:8080" help:"url to connect to" `
-	KeyPath   string `name:"keypath" help:"path to the encypted private key" type:"path"`
+	ServerURL  string `name:"server" default:"http://127.0.0.1:8080" help:"url to connect to" `
+	KeyPath    string `name:"keypath" help:"path to the encypted private key" type:"path"`
+	passphrase string //this is only for testing DONT USE
 }
 
 func (cl *ClientCmd) Run(ctx *Context) error {
@@ -189,14 +198,18 @@ func (cl *ClientCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	fmt.Println("please enter your passphrase:")
-	pass, err := term.ReadPassword(int(os.Stdin.Fd()))
-	if err != nil {
-		return err
+	passphrase := cl.passphrase
+	if passphrase == "" {
+		fmt.Println("please enter your passphrase:")
+		pass, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			return err
+		}
+		passphrase = string(pass)
 	}
 	// TODO, we should to some peeking to ensure we got the right type of
 	// key, for now we assume age encrypted key
-	sdclient, err := client.LoadArmoredKeyWithReaderAndPassPhrase(f, string(pass), logger)
+	sdclient, err := client.LoadArmoredKeyWithReaderAndPassPhrase(f, passphrase, logger)
 	if err != nil {
 		fmt.Printf("cannot load key, bad passphrase?\n")
 		return nil
