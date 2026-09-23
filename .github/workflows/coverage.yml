@@ -1,5 +1,6 @@
 on: [push, pull_request]
 name: Coverage
+jobs:
   covercheck:
     name: covercheck
     runs-on: ubuntu-latest
