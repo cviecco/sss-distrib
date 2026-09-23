@@ -338,14 +338,3 @@ func TestGetLoggableString(t *testing.T) {
 		})
 	}
 }
-
-func TestServerClient(t *testing.T) {
-	//setup 2 client keys
-	// create document from these public keys
-	// save/serialize document to disk
-	// setup server to load document from disk
-	// gofunc to start server
-	// select to ensure it actually succeeds
-	// start client
-
-}
