@@ -98,6 +98,7 @@ func NewProcessorFromShareDoc(sd *ShareDoc, logger *slog.Logger) (*SssProcessor,
 	rvalue := SssProcessor{
 		Doc:            sd,
 		processedShare: make(map[string][]byte),
+		logger:         logger,
 	}
 	var err error
 	rvalue.agePQKey, err = age.GenerateHybridIdentity()
