@@ -2,7 +2,7 @@
 
 [![Test](https://github.com/cviecco/sss-distrib/actions/workflows/test.yml/badge.svg)](https://github.com/cviecco/sss-distrib/actions/workflows/test.yml)
 
-Across several projects I have come with the need to share sss (shamir secret sharing) shares with users.
+Across several projects I have come with the need to share a secret using sss (shamir secret sharing) shares with users.
 However to do so securely you need to encrypt each share with somthing that only the user can use
 to extract the share. In addition since this is usualy part of a bootstrap protocol mTLS is usually
 not available and given the prominence of TLS interception points I also want the passing of the share
@@ -12,7 +12,10 @@ Thus there was a need for a library that:
 * Given a set public keys and a threshold is able to generate encryped share for each public key.
 * This generation will be in the form of a single document so that users only need to worry about keeping 
 their private keys. All other information will be kept in the document
-* A server
+* A server that is able to do a pseudo session with the injectors so that the secret cannot be in plaintext
+(so that It cannot be logged even by accident) and that prevents an attacker from replaying a message.
+* a server session that is time independent (as during boostrap time can we way off between server and client)
+
 
 
 #### Users public Key format
@@ -20,12 +23,18 @@ Its 2026 and Johnny cannot encrypt file long term.
 GPG works, but is combersome to use. However has lots of tooling around to make it work
 AGE nice cyptography, trusting the filesystem by default is not workable for long term secrets.
 
+### Attacker model
+This project assumes a passive TLS intereptor environment. Where the protected streams are NOT end
+to end between client and server (DLP software, TLS terminating load balancers). The system should
+prevent this attacker from being able to either obtain any of the shares or be able to replay the share
+message to unseal another server.
 
- 
+This library currently does NOT prevent an active attacker that modifies messages in transit.
 
 
-##
-Goal:
+
+#### Goals:
+
 
 1. Given a set of public gpg public keys(M), and a number (N) splits
    1. Generate a new 256 bit secret
