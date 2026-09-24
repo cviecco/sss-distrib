@@ -33,6 +33,24 @@ message to unseal another server.
 This library currently does NOT prevent an active attacker that modifies messages in transit.
 
 
+#### Dependecncies
+We have tried to minimize the number of non native libraries. To reduce the risk
+of supply chaing issues.
+
+The library has 4 package dependencies:
+1. github.com/lydianpay/shamir-secret-sharing for the shamir secret sharing implementation
+2. filippo.io/age for age operations 
+3. github.com/ProtonMail/gopenpgp/v3 for gpg operations 
+4. golang.org/x/crypto for the hkdf implementaiton for the replay prevention.
+
+The cli command adds dependencies on:
+1. github.com/alecthomas/kong for cli parsing
+2. golang.org/x/term for password/passphrase reading
+
+Testing adds:
+1. github.com/stretchr/testify for simpler tests
+2. github.com/neilotoole/slogt/v2 for slog mocking 
+
 
 #### Goals:
 
