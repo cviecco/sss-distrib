@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"filippo.io/age"
+	"github.com/neilotoole/slogt/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,6 +21,7 @@ import (
 // get public keys
 
 func generateBaseTestingDoc(t *testing.T) ([]byte, *SssProcessor, []*age.X25519Identity, error) {
+	logger := slogt.New(t)
 	secret, err := generateSecret()
 	require.NoError(t, err)
 	var identities []*age.X25519Identity
@@ -44,7 +46,7 @@ func generateBaseTestingDoc(t *testing.T) ([]byte, *SssProcessor, []*age.X25519I
 	requiredShares := 2
 	shareDoc, err := generateDocWithSecret(secret, recipients, strIdentities, requiredShares)
 	require.NoError(t, err)
-	sssdoc, err := NewProcessorFromShareDoc(shareDoc)
+	sssdoc, err := NewProcessorFromShareDoc(shareDoc, logger)
 	require.NoError(t, err)
 	return secret, sssdoc, identities, nil
 }

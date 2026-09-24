@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -37,19 +38,14 @@ type SssProcessor struct {
 	sharedSecret   []byte
 	processedShare map[string][]byte
 	// TODO add data mutex
+	datamutex sync.Mutex
 
 	Doc               *ShareDoc
 	agePQKey          *age.HybridIdentity
 	rProtector        *replayProtector
 	ProcesssingTarget string
 
-	messageNonces [][]byte
-	nonceMutex    sync.Mutex
-}
-
-func NewSSSDoc() (*SssProcessor, error) {
-
-	return nil, fmt.Errorf("not implemented")
+	logger *slog.Logger
 }
 
 // utility function should be moved somewhere else
@@ -77,10 +73,10 @@ func GenerateNewDocFromKeys(recipients [][]byte, requiredShares int) (*ShareDoc,
 	for i, _ := range recipients {
 		identifiers = append(identifiers, fmt.Sprintf("%d", i))
 	}
-	return GenerateNewDocFromKeysAndIdentifiers(recipients, identifiers, requiredShares)
+	return generateNewDocFromKeysAndIdentifiers(recipients, identifiers, requiredShares)
 }
 
-func GenerateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
+func generateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
 	secret, err := generateSecret()
 	if err != nil {
 		return nil, err
@@ -88,20 +84,21 @@ func GenerateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []str
 	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
-func NewProcessorFromShareDocJSON(serializedDoc []byte) (*SssProcessor, error) {
+func NewProcessorFromShareDocJSON(serializedDoc []byte, logger *slog.Logger) (*SssProcessor, error) {
 	var parsedDoc ShareDoc
 	err := json.Unmarshal(serializedDoc, &parsedDoc)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewProcessorFromShareDoc(&parsedDoc)
+	return NewProcessorFromShareDoc(&parsedDoc, logger)
 }
 
-func NewProcessorFromShareDoc(sd *ShareDoc) (*SssProcessor, error) {
+func NewProcessorFromShareDoc(sd *ShareDoc, logger *slog.Logger) (*SssProcessor, error) {
 	rvalue := SssProcessor{
 		Doc:            sd,
 		processedShare: make(map[string][]byte),
+		logger:         logger,
 	}
 	var err error
 	rvalue.agePQKey, err = age.GenerateHybridIdentity()
@@ -202,7 +199,13 @@ func gpgDecryptSingleShareWithPassPhrase(share EncrypedShare, armoredPrivate []b
 
 func GpgDecryptSingleShare(share EncrypedShare, privateKey *crypto.Key) ([]byte, error) {
 	pgp := crypto.PGP()
-	decHandle, err := pgp.Decryption().DecryptionKey(privateKey).New()
+	// Since dechandle.ClearPrivateParams also clears the private key
+	// we make a copy so that the incoming key is not modified
+	keyCopy, err := privateKey.Copy()
+	if err != nil {
+		return nil, fmt.Errorf("unable to copy gpg private key: %w", err)
+	}
+	decHandle, err := pgp.Decryption().DecryptionKey(keyCopy).New()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create gpg decryption handle: %w", err)
 	}

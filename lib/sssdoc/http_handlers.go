@@ -219,5 +219,6 @@ func (sp *SssProcessor) ProcessKeyShareHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 	//On success we just return the status doc
+	sp.logger.Debug("Processor: correctly processed key share")
 	sp.GetShareStatusHandler(w, r)
 }
