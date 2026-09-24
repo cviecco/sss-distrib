@@ -1,6 +1,7 @@
 # sss-distrib
 
 [![Test](https://github.com/cviecco/sss-distrib/actions/workflows/test.yml/badge.svg)](https://github.com/cviecco/sss-distrib/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/cviecco/sss-distrib/graph/badge.svg?token=E0Z157E0PW)](https://codecov.io/gh/cviecco/sss-distrib)
 
 Across several projects I have come with the need to share a secret using sss (shamir secret sharing) shares with users.
 However to do so securely you need to encrypt each share with somthing that only the user can use
