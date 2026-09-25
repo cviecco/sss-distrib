@@ -2,6 +2,7 @@ package sssdoc
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"filippo.io/age"
 	"github.com/neilotoole/slogt/v2"
@@ -165,6 +167,33 @@ func TestProcessEncryptedShareFromParamsSuccess(t *testing.T) {
 
 }
 
+// Generated via claude (sonnet 5)
+func TestParseEncryptedShareFromParamsErrors(t *testing.T) {
+	_, sd, _, err := generateBaseTestingDoc(t)
+	require.NoError(t, err)
+
+	t.Run("invalid base64 value", func(t *testing.T) {
+		values := url.Values{EncMessageKey: []string{"not-valid-base64!!"}}
+		req := httptest.NewRequest("POST", "/", strings.NewReader(values.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+
+		params, err := sd.ParseEncryptedShareFromParams(w, req)
+		require.Error(t, err)
+		require.Nil(t, params)
+	})
+
+	t.Run("missing required parameter", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/", strings.NewReader(url.Values{}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		w := httptest.NewRecorder()
+
+		params, err := sd.ParseEncryptedShareFromParams(w, req)
+		require.Error(t, err)
+		require.Nil(t, params)
+	})
+}
+
 func TestEncryptDecryptMessage(t *testing.T) {
 	//hybridKey, err := age.New
 
@@ -201,4 +230,56 @@ func TestEncryptDecryptMessage(t *testing.T) {
 		[]byte(agePQKey.String()), messageSubject, rprotector)
 	require.Error(t, err)
 
+}
+
+// Generated via claude (sonnet 5)
+func TestDecryptValidateAgeMessageInternalNegative(t *testing.T) {
+	agePQKey, err := age.GenerateHybridIdentity()
+	require.NoError(t, err)
+	rprotector, err := NewReplayProtector()
+	require.NoError(t, err)
+	privateKey := []byte(agePQKey.String())
+	messageSubject := "target1"
+
+	t.Run("data not actually age encrypted", func(t *testing.T) {
+		randomBytes := make([]byte, 128)
+		_, err := rand.Read(randomBytes)
+		require.NoError(t, err)
+
+		_, err = decryptValidateAgeMessageInternal(randomBytes, privateKey, messageSubject, rprotector)
+		require.Error(t, err)
+	})
+
+	t.Run("decrypted content is not valid json", func(t *testing.T) {
+		var encBuf bytes.Buffer
+		w, err := age.Encrypt(&encBuf, agePQKey.Recipient())
+		require.NoError(t, err)
+		_, err = w.Write([]byte("this is not json"))
+		require.NoError(t, err)
+		require.NoError(t, w.Close())
+
+		_, err = decryptValidateAgeMessageInternal(encBuf.Bytes(), privateKey, messageSubject, rprotector)
+		require.Error(t, err)
+	})
+
+	t.Run("invalid target", func(t *testing.T) {
+		nonce, err := rprotector.GetProtectorBytes()
+		require.NoError(t, err)
+		b64nonce := base64.StdEncoding.EncodeToString(nonce)
+		encMessage, err := newAgeEncryptedMessageInternal([]byte("hello"),
+			[]byte(agePQKey.Recipient().String()), messageSubject, b64nonce, time.Now())
+		require.NoError(t, err)
+
+		_, err = decryptValidateAgeMessageInternal(encMessage, privateKey, "wrong-subject", rprotector)
+		require.Error(t, err)
+	})
+
+	t.Run("nonce not encoded in base64", func(t *testing.T) {
+		encMessage, err := newAgeEncryptedMessageInternal([]byte("hello"),
+			[]byte(agePQKey.Recipient().String()), messageSubject, "not-valid-base64!!", time.Now())
+		require.NoError(t, err)
+
+		_, err = decryptValidateAgeMessageInternal(encMessage, privateKey, messageSubject, rprotector)
+		require.Error(t, err)
+	})
 }
