@@ -45,10 +45,11 @@ func generateBaseTestingDoc(t *testing.T) ([]byte, *SssProcessor, []*age.X25519I
 		recipients = append(recipients, []byte(identity.Recipient().String()))
 		strIdentities[i] = fmt.Sprintf("%d", i)
 	}
+	doneCh := make(chan bool)
 	requiredShares := 2
 	shareDoc, err := generateDocWithSecret(secret, recipients, strIdentities, requiredShares)
 	require.NoError(t, err)
-	sssdoc, err := NewProcessorFromShareDoc(shareDoc, logger)
+	sssdoc, err := NewProcessorFromShareDoc(shareDoc, doneCh, logger)
 	require.NoError(t, err)
 	return secret, sssdoc, identities, nil
 }

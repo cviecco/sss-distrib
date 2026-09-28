@@ -151,8 +151,8 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 		require.NoError(t, err)
 		plaintextSecrets = append(plaintextSecrets, ptShare)
 	}
-
-	sssDoc, err := NewProcessorFromShareDoc(shareDoc, logger)
+	doneCh := make(chan bool)
+	sssDoc, err := NewProcessorFromShareDoc(shareDoc, doneCh, logger)
 	require.NoError(t, err)
 	require.NotNil(t, sssDoc)
 

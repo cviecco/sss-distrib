@@ -45,6 +45,8 @@ type SssProcessor struct {
 	rProtector        *replayProtector
 	ProcesssingTarget string
 
+	donech chan bool
+
 	logger *slog.Logger
 }
 
@@ -91,14 +93,15 @@ func NewProcessorFromShareDocJSON(serializedDoc []byte, logger *slog.Logger) (*S
 		return nil, err
 	}
 
-	return NewProcessorFromShareDoc(&parsedDoc, logger)
+	return NewProcessorFromShareDoc(&parsedDoc, nil, logger)
 }
 
-func NewProcessorFromShareDoc(sd *ShareDoc, logger *slog.Logger) (*SssProcessor, error) {
+func NewProcessorFromShareDoc(sd *ShareDoc, doneChan chan bool, logger *slog.Logger) (*SssProcessor, error) {
 	rvalue := SssProcessor{
 		Doc:            sd,
 		processedShare: make(map[string][]byte),
 		logger:         logger,
+		donech:         doneChan,
 	}
 	var err error
 	rvalue.agePQKey, err = age.GenerateHybridIdentity()
@@ -222,6 +225,8 @@ func (sd *SssProcessor) ProcessShare(plaintextShare []byte) ([]byte, error) {
 	shareFP := sha512.Sum512(plaintextShare)
 	b64ShareFP := base64.StdEncoding.EncodeToString(shareFP[:])
 
+	sd.datamutex.Lock()
+	defer sd.datamutex.Unlock()
 	for _, encShare := range sd.Doc.Shares {
 		if !bytes.Equal(shareFP[:], encShare.PlaintextFingerPrint) {
 			continue
@@ -245,6 +250,12 @@ func (sd *SssProcessor) ProcessShare(plaintextShare []byte) ([]byte, error) {
 		}
 		// TODO:: ensure new is same if not nil
 		sd.sharedSecret = secret
+		// notify if channel exists
+		if sd.donech != nil {
+			go func() {
+				sd.donech <- true
+			}()
+		}
 		return sd.sharedSecret, nil
 	}
 	return sd.sharedSecret, fmt.Errorf("Suggested Share does not match any fingerprint")

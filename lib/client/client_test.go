@@ -157,7 +157,7 @@ func TestPushToServer(t *testing.T) {
 
 	doc, err := sssdoc.GenerateNewDocFromKeys(publicKeys, 2)
 	require.NoError(t, err)
-	processor, err := sssdoc.NewProcessorFromShareDoc(doc, logger)
+	processor, err := sssdoc.NewProcessorFromShareDoc(doc, nil, logger)
 	require.NoError(t, err)
 
 	mux := http.NewServeMux()
