@@ -177,9 +177,8 @@ func TestParseEncryptedShareFromParamsErrors(t *testing.T) {
 		values := url.Values{EncMessageKey: []string{"not-valid-base64!!"}}
 		req := httptest.NewRequest("POST", "/", strings.NewReader(values.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		w := httptest.NewRecorder()
 
-		params, err := sd.ParseEncryptedShareFromParams(w, req)
+		params, err := sd.ParseEncryptedShareFromParams(req)
 		require.Error(t, err)
 		require.Nil(t, params)
 	})
@@ -187,9 +186,8 @@ func TestParseEncryptedShareFromParamsErrors(t *testing.T) {
 	t.Run("missing required parameter", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/", strings.NewReader(url.Values{}.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		w := httptest.NewRecorder()
 
-		params, err := sd.ParseEncryptedShareFromParams(w, req)
+		params, err := sd.ParseEncryptedShareFromParams(req)
 		require.Error(t, err)
 		require.Nil(t, params)
 	})
