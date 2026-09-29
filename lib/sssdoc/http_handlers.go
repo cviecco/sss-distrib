@@ -72,18 +72,23 @@ type SssKexchangeKeys struct {
 	Base64ReplayNonce string   `json:"b64_replay_nonce"`
 }
 
-func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, r *http.Request) {
-	replayNonce, err := doc.rProtector.GetProtectorBytes()
+func (sp *SssProcessor) GetKeyEchangeDocument() ([]byte, error) {
+	replayNonce, err := sp.rProtector.GetProtectorBytes()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	b64replayNonce := base64.StdEncoding.EncodeToString(replayNonce)
-	pubAgeString := doc.agePQKey.Recipient().String()
+	pubAgeString := sp.agePQKey.Recipient().String()
 	payload, err := json.Marshal(SssKexchangeKeys{
 		AgePubKeys:        []string{pubAgeString},
 		Base64ReplayNonce: b64replayNonce,
 	})
+	return payload, nil
+
+}
+
+func (doc *SssProcessor) GetKeyExchangePublicKeysHandler(w http.ResponseWriter, r *http.Request) {
+	payload, err := doc.GetKeyEchangeDocument()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -180,7 +185,7 @@ func (doc *SssProcessor) ProcessEncrypedShareMessageFromParams(params processEnc
 // TODO, actually write a function that does the encoding for you and returns a request
 const EncMessageKey = "b64encShare"
 
-func (sp *SssProcessor) ParseEncryptedShareFromParams(w http.ResponseWriter, r *http.Request) (*processEncrypedShareParams, error) {
+func (sp *SssProcessor) ParseEncryptedShareFromParams(r *http.Request) (*processEncrypedShareParams, error) {
 	err := r.ParseForm()
 	if err != nil {
 		return nil, err
@@ -202,7 +207,7 @@ func (sp *SssProcessor) ParseEncryptedShareFromParams(w http.ResponseWriter, r *
 // Keys should always be passed encrypted
 func (sp *SssProcessor) ProcessKeyShareHandler(w http.ResponseWriter, r *http.Request) {
 	/// wrap in limited reader?
-	params, err := sp.ParseEncryptedShareFromParams(w, r)
+	params, err := sp.ParseEncryptedShareFromParams(r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Bad/Invalid params: %s ", err), http.StatusBadRequest)
 		return

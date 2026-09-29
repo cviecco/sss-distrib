@@ -42,7 +42,7 @@ type SssProcessor struct {
 
 	Doc               *ShareDoc
 	agePQKey          *age.HybridIdentity
-	rProtector        *replayProtector
+	rProtector        replayChecker
 	ProcesssingTarget string
 
 	donech chan bool
@@ -86,14 +86,14 @@ func generateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []str
 	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
-func NewProcessorFromShareDocJSON(serializedDoc []byte, logger *slog.Logger) (*SssProcessor, error) {
+func NewProcessorFromShareDocJSON(serializedDoc []byte, doneChan chan bool, logger *slog.Logger) (*SssProcessor, error) {
 	var parsedDoc ShareDoc
 	err := json.Unmarshal(serializedDoc, &parsedDoc)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewProcessorFromShareDoc(&parsedDoc, nil, logger)
+	return NewProcessorFromShareDoc(&parsedDoc, doneChan, logger)
 }
 
 func NewProcessorFromShareDoc(sd *ShareDoc, doneChan chan bool, logger *slog.Logger) (*SssProcessor, error) {
