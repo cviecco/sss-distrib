@@ -282,3 +282,28 @@ func TestDecryptValidateAgeMessageInternalNegative(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// brokenReplayChecker is a test implementation of replayChecker that always returns an error
+// from GetProtectorBytes.
+type brokenReplayChecker struct{}
+
+func (b *brokenReplayChecker) CheckReplayExists(in []byte) bool {
+	return false
+}
+
+func (b *brokenReplayChecker) GetProtectorBytes() ([]byte, error) {
+	return nil, fmt.Errorf("simulated replay protector failure")
+}
+
+func TestGetKeyEchangeDocumentReplayProtectorError(t *testing.T) {
+	_, sd, _, err := generateBaseTestingDoc(t)
+	require.NoError(t, err)
+
+	// Replace the real replay protector with a broken one
+	sd.rProtector = &brokenReplayChecker{}
+
+	// GetKeyEchangeDocument should propagate the error from GetProtectorBytes
+	_, err = sd.GetKeyEchangeDocument()
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "simulated replay protector failure")
+}
