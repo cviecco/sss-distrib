@@ -158,8 +158,9 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 
 	found := false
 	for _, ptShare := range plaintextSecrets {
-		rebuiltSecret, err := sssDoc.ProcessShare(ptShare)
+		_, err := sssDoc.ProcessShare(ptShare)
 		require.NoError(t, err)
+		rebuiltSecret := sssDoc.GetSecret()
 		if rebuiltSecret != nil {
 			found = true
 			require.Equal(t, rebuiltSecret, secret)
@@ -211,8 +212,9 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 
 	found := false
 	for _, ptShare := range plaintextSecrets {
-		rebuiltSecret, err := sssDoc.ProcessShare(ptShare)
+		_, err := sssDoc.ProcessShare(ptShare)
 		require.NoError(t, err)
+		rebuiltSecret := sssDoc.GetSecret()
 		if rebuiltSecret != nil {
 			found = true
 			require.Equal(t, rebuiltSecret, secret)

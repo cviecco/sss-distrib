@@ -178,7 +178,7 @@ func TestParseEncryptedShareFromParamsErrors(t *testing.T) {
 		req := httptest.NewRequest("POST", "/", strings.NewReader(values.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		params, err := sd.ParseEncryptedShareFromParams(req)
+		params, err := sd.parseEncryptedShareFromParams(req)
 		require.Error(t, err)
 		require.Nil(t, params)
 	})
@@ -187,7 +187,7 @@ func TestParseEncryptedShareFromParamsErrors(t *testing.T) {
 		req := httptest.NewRequest("POST", "/", strings.NewReader(url.Values{}.Encode()))
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-		params, err := sd.ParseEncryptedShareFromParams(req)
+		params, err := sd.parseEncryptedShareFromParams(req)
 		require.Error(t, err)
 		require.Nil(t, params)
 	})
