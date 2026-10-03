@@ -114,6 +114,10 @@ func NewProcessorFromShareDoc(sd *ShareDoc, logger *slog.Logger) (*SssProcessor,
 	return &rvalue, nil
 }
 
+func (sp *SssProcessor) SetDoneChannel(inchan chan bool) {
+	sp.donech = inchan
+}
+
 const randomStringEntropyBytes = 32
 
 func encryptDataWithPublic(plaintextData []byte, recipientPublic []byte) ([]byte, int, error) {
