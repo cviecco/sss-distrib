@@ -170,14 +170,14 @@ type parsedEncrypedShareParams struct {
 	EncrypedShare []byte
 }
 
-func (doc *SssProcessor) processEncrypedShareMessageFromParams(params parsedEncrypedShareParams) (usererr error, internalerr error) {
+func (doc *SssProcessor) processEncrypedShareMessageFromParams(params parsedEncrypedShareParams) (shareId string, usererr error, internalerr error) {
 	plaintextShare, err := DecryptValidateAgeMessage(params.EncrypedShare, []byte(doc.agePQKey.String()), doc.ProcesssingTarget, doc.rProtector)
 	if err != nil {
 		fmt.Printf("error decrypting message=%s", err)
-		return err, nil
+		return "", err, nil
 	}
-	_, err = doc.ProcessShare(plaintextShare)
-	return nil, err
+	shareId, err = doc.ProcessShare(plaintextShare)
+	return shareId, err, nil
 
 }
 
@@ -205,17 +205,16 @@ func (sp *SssProcessor) parseEncryptedShareFromParams(r *http.Request) (*parsedE
 
 // ProcessEncryptedShareMessageFromRequest allows to have a custom webhandler for the
 // processing of the request.
-func (sp *SssProcessor) ProcessEncrypedShareMessageFromRequest(r *http.Request) (secret []byte, userErr error, err error) {
+func (sp *SssProcessor) ProcessEncrypedShareMessageFromRequest(r *http.Request) (identity string, userErr error, err error) {
 	params, err := sp.parseEncryptedShareFromParams(r)
 	if err != nil {
-		return nil, err, nil
+		return "", err, nil
 	}
-	userErr, err = sp.processEncrypedShareMessageFromParams(*params)
+	identity, userErr, err = sp.processEncrypedShareMessageFromParams(*params)
 	if err != nil || userErr != nil {
-		return nil, userErr, err
+		return identity, userErr, err
 	}
-	secret = sp.GetSecret()
-	return secret, nil, nil
+	return identity, nil, nil
 
 }
 
@@ -223,16 +222,6 @@ func (sp *SssProcessor) ProcessEncrypedShareMessageFromRequest(r *http.Request) 
 func (sp *SssProcessor) ProcessKeyShareHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, userErr, err := sp.ProcessEncrypedShareMessageFromRequest(r)
-	/*
-		/// wrap in limited reader?
-		params, err := sp.parseEncryptedShareFromParams(r)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Bad/Invalid params: %s ", err), http.StatusBadRequest)
-			return
-		}
-		//userErr, err := sp.ProcessEncryptedShareFromParams(*params)
-		userErr, err := sp.processEncrypedShareMessageFromParams(*params)
-	*/
 	if userErr != nil {
 		http.Error(w, fmt.Sprintf("Bad/Invalid params: %s ", err), http.StatusBadRequest)
 		return

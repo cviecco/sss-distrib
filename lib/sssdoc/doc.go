@@ -86,22 +86,21 @@ func generateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []str
 	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
 }
 
-func NewProcessorFromShareDocJSON(serializedDoc []byte, doneChan chan bool, logger *slog.Logger) (*SssProcessor, error) {
+func NewProcessorFromShareDocJSON(serializedDoc []byte, logger *slog.Logger) (*SssProcessor, error) {
 	var parsedDoc ShareDoc
 	err := json.Unmarshal(serializedDoc, &parsedDoc)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewProcessorFromShareDoc(&parsedDoc, doneChan, logger)
+	return NewProcessorFromShareDoc(&parsedDoc, logger)
 }
 
-func NewProcessorFromShareDoc(sd *ShareDoc, doneChan chan bool, logger *slog.Logger) (*SssProcessor, error) {
+func NewProcessorFromShareDoc(sd *ShareDoc, logger *slog.Logger) (*SssProcessor, error) {
 	rvalue := SssProcessor{
 		Doc:            sd,
 		processedShare: make(map[string][]byte),
 		logger:         logger,
-		donech:         doneChan,
 	}
 	var err error
 	rvalue.agePQKey, err = age.GenerateHybridIdentity()
