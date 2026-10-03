@@ -139,7 +139,7 @@ func (scommand *ServerDemoCmd) Run(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-
+	// TODO: Add channel an terminate server when unsealed
 	processor, err := sssdoc.NewProcessorFromShareDocJSON(serializedDoc, logger)
 	if err != nil {
 		return err

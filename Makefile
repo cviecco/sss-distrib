@@ -3,6 +3,9 @@
 test:
 	go test ./...
 
+build:
+	go build -o bin/ ./...
+
 
 coverage.txt:
 	go test -coverprofile=coverage.txt ./...

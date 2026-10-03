@@ -35,15 +35,17 @@ type ShareDoc struct {
 }
 
 type SssProcessor struct {
-	sharedSecret   []byte
-	processedShare map[string][]byte
+	reassembledSecret []byte
+	processedShare    map[string][]byte
 	// TODO add data mutex
 	datamutex sync.Mutex
 
 	Doc               *ShareDoc
 	agePQKey          *age.HybridIdentity
-	rProtector        *replayProtector
+	rProtector        replayChecker
 	ProcesssingTarget string
+
+	donech chan bool
 
 	logger *slog.Logger
 }
@@ -218,18 +220,21 @@ func GpgDecryptSingleShare(share EncrypedShare, privateKey *crypto.Key) ([]byte,
 	return decrypted.Bytes(), nil
 }
 
-func (sd *SssProcessor) ProcessShare(plaintextShare []byte) ([]byte, error) {
+func (sd *SssProcessor) ProcessShare(plaintextShare []byte) (string, error) {
 	shareFP := sha512.Sum512(plaintextShare)
 	b64ShareFP := base64.StdEncoding.EncodeToString(shareFP[:])
 
+	sd.datamutex.Lock()
+	defer sd.datamutex.Unlock()
 	for _, encShare := range sd.Doc.Shares {
 		if !bytes.Equal(shareFP[:], encShare.PlaintextFingerPrint) {
 			continue
 		}
+		identity := encShare.Identifier
 		//encS
 		_, ok := sd.processedShare[b64ShareFP]
 		if ok {
-			return sd.sharedSecret, nil
+			return identity, nil
 		}
 		sd.processedShare[b64ShareFP] = plaintextShare
 		shareSet := [][]byte{}
@@ -237,17 +242,27 @@ func (sd *SssProcessor) ProcessShare(plaintextShare []byte) ([]byte, error) {
 			shareSet = append(shareSet, share)
 		}
 		if len(shareSet) < sd.Doc.RequiredShares {
-			return nil, nil
+			return identity, nil
 		}
 		secret, err := combineSecret(shareSet)
 		if err != nil {
-			return nil, err
+			return identity, err
 		}
 		// TODO:: ensure new is same if not nil
-		sd.sharedSecret = secret
-		return sd.sharedSecret, nil
+		sd.reassembledSecret = secret
+		// notify if channel exists
+		if sd.donech != nil {
+			go func() {
+				sd.donech <- true
+			}()
+		}
+		return identity, nil
 	}
-	return sd.sharedSecret, fmt.Errorf("Suggested Share does not match any fingerprint")
+	return "", fmt.Errorf("Suggested Share does not match any fingerprint")
 }
 
-const httpReaderMaxBytes = 65535
+func (sp *SssProcessor) GetSecret() []byte {
+	sp.datamutex.Lock()
+	defer sp.datamutex.Unlock()
+	return bytes.Clone(sp.reassembledSecret)
+}

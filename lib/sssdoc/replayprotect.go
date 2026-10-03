@@ -13,6 +13,7 @@ import (
 
 type replayChecker interface {
 	CheckReplayExists(in []byte) bool
+	GetProtectorBytes() ([]byte, error)
 }
 
 const replayByteSize = 16
