@@ -166,6 +166,25 @@ func TestCreateDecodeRoundTrip(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+
+	sp2, err := NewProcessorFromShareDoc(shareDoc, logger)
+	require.NoError(t, err)
+	require.NotNil(t, sp2)
+
+	doneChan := make(chan bool, 3)
+	sp2.SetDoneChannel(doneChan)
+	for i, ptShare := range plaintextSecrets {
+		processedIdentity, err := sp2.ProcessShare(ptShare)
+		require.NoError(t, err)
+		require.Equal(t, processedIdentity, shareDoc.Shares[i].Identifier)
+		rebuiltSecret := sp2.GetSecret()
+		if rebuiltSecret != nil {
+			ready := <-doneChan
+			require.True(t, ready)
+			require.Equal(t, rebuiltSecret, secret)
+		}
+	}
+
 }
 
 func TestGpgCreateDecodeRoundTrip(t *testing.T) {
