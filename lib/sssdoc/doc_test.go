@@ -222,6 +222,72 @@ func TestGpgCreateDecodeRoundTrip(t *testing.T) {
 	require.True(t, found)
 }
 
+// Created by claude (opus 5.5)
+func TestGenerateNewDocWithSecretRoundTrip(t *testing.T) {
+	logger := slogt.New(t)
+	secret := []byte("a caller supplied secret that must survive the round trip")
+
+	// Mix age and gpg recipients so both encryption paths are exercised
+	gpgPrivateKey, err := crypto.NewPrivateKeyFromArmored(pgp_sss_test_2, []byte(testPassphrase))
+	require.NoError(t, err)
+	gpgPublicKey, err := gpgPrivateKey.ToPublic()
+	require.NoError(t, err)
+	gpgArmoredPub, err := gpgPublicKey.GetArmoredPublicKey()
+	require.NoError(t, err)
+
+	recipients := [][]byte{
+		[]byte("age10hfzhu2hfw6wjn2vjjrqdke3yf5vzk9twwjz505tfv984tdegchs8kuwg6"),
+		[]byte(gpgArmoredPub),
+		[]byte("age1j3nhn07hllphue7d8n675csazfku8969c8j82g7kkfs0cepcpqfs9qykdz"),
+	}
+	shareDoc, err := GenerateNewDocWithSecret(recipients, 2, secret)
+	require.NoError(t, err)
+	require.Equal(t, 2, shareDoc.RequiredShares)
+	require.Equal(t, len(recipients), len(shareDoc.Shares))
+	require.Equal(t, KeyTypeAge, shareDoc.Shares[0].KeyType)
+	require.Equal(t, KeyTypePGP, shareDoc.Shares[1].KeyType)
+	require.Equal(t, KeyTypeAge, shareDoc.Shares[2].KeyType)
+
+	plaintextShares := make([][]byte, len(recipients))
+	for _, i := range []int{0, 2} {
+		ageKey := age_test_key_1
+		if i == 2 {
+			ageKey = age_test_key_3
+		}
+		identity, err := age.ParseIdentities(bytes.NewReader([]byte(ageKey)))
+		require.NoError(t, err)
+		plaintextShares[i], err = AgeDecryptSingleShare(shareDoc.Shares[i], identity)
+		require.NoError(t, err)
+	}
+	plaintextShares[1], err = GpgDecryptSingleShare(shareDoc.Shares[1], gpgPrivateKey)
+	require.NoError(t, err)
+
+	for i, share := range shareDoc.Shares {
+		require.Equal(t, fmt.Sprintf("%d", i), share.Identifier)
+		// Shares must not leak the secret in plaintext
+		require.NotContains(t, string(share.EncryptedBlob), string(secret))
+	}
+
+	serializedShareDoc, err := json.Marshal(shareDoc)
+	require.NoError(t, err)
+
+	// Every pair of shares must reconstruct the original secret
+	for a := 0; a < len(plaintextShares); a++ {
+		for b := a + 1; b < len(plaintextShares); b++ {
+			sp, err := NewProcessorFromShareDocJSON(serializedShareDoc, logger)
+			require.NoError(t, err)
+
+			_, err = sp.ProcessShare(plaintextShares[a])
+			require.NoError(t, err)
+			require.Nil(t, sp.GetSecret(), "secret must not be available below threshold")
+
+			_, err = sp.ProcessShare(plaintextShares[b])
+			require.NoError(t, err)
+			require.Equal(t, secret, sp.GetSecret(), "shares %d and %d", a, b)
+		}
+	}
+}
+
 // Created by claude (sonnet 5)
 func TestLoadMultifiles(t *testing.T) {
 	dir := t.TempDir()
