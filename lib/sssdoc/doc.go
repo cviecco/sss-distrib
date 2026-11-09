@@ -78,6 +78,14 @@ func GenerateNewDocFromKeys(recipients [][]byte, requiredShares int) (*ShareDoc,
 	return generateNewDocFromKeysAndIdentifiers(recipients, identifiers, requiredShares)
 }
 
+func GenerateNewDocWithSecret(recipients [][]byte, requiredShares int, secret []byte) (*ShareDoc, error) {
+	var identifiers []string
+	for i, _ := range recipients {
+		identifiers = append(identifiers, fmt.Sprintf("%d", i))
+	}
+	return generateDocWithSecret(secret, recipients, identifiers, requiredShares)
+}
+
 func generateNewDocFromKeysAndIdentifiers(recipients [][]byte, identifiers []string, requiredShares int) (*ShareDoc, error) {
 	secret, err := generateSecret()
 	if err != nil {
